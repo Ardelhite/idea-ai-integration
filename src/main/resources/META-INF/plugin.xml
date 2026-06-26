@@ -28,7 +28,7 @@
         <toolWindow
                 id="Karato"
                 anchor="right"
-                icon="AllIcons.Toolwindows.ToolWindowMessages"
+                icon="/icons/karatoToolwindow.png"
                 factoryClass="ai.sanakan.fugu.ui.FuguToolWindowFactory"/>
 
         <!-- Open the Karato tool window by default when a project loads. -->

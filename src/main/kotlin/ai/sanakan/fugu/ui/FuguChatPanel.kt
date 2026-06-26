@@ -63,7 +63,6 @@ class FuguChatPanel(
     val session: FuguSession,
     private val onNewTab: () -> Unit = {},
     private val onRename: (String) -> Unit = {},
-    private val onCloseTab: () -> Unit = {},
 ) : JPanel(BorderLayout()), Disposable, FuguSession.Listener {
 
     private val transcript = JPanel().apply {
@@ -171,10 +170,11 @@ class FuguChatPanel(
         mcpCombo.maximumSize = Dimension(JBUI.scale(120), mcpCombo.preferredSize.height)
         mcpCombo.addActionListener { onMcpModeSelected() }
 
+        // Right-aligned: MCP scope + new-tab "+".  Closing a tab is the native × on
+        // the tab itself (next to its number).
         val right = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
         right.add(mcpCombo)
         right.add(iconButton(AllIcons.General.Add, "New chat tab") { onNewTab() })
-        right.add(iconButton(AllIcons.Actions.Close, "End this session and discard its log") { onCloseTab() })
 
         return JPanel(BorderLayout()).apply {
             isOpaque = false

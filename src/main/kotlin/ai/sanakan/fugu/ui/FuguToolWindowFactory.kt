@@ -33,7 +33,6 @@ class FuguToolWindowFactory : ToolWindowFactory, DumbAware {
                 session = session,
                 onNewTab = { openTab(manager.create(), true) },
                 onRename = { title -> contentRef[0]?.displayName = title },
-                onCloseTab = { contentRef[0]?.let { cm.removeContent(it, true) } },
             )
             val content = factory.createContent(panel, session.title, false)
             contentRef[0] = content
