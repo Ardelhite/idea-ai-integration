@@ -213,6 +213,8 @@ class FuguChatPanel(
 
     private fun buildSetupBanner(): EditorNotificationPanel =
         EditorNotificationPanel(EditorNotificationPanel.Status.Warning).apply {
+            // Hidden until the async setup probe decides — avoids flashing the warning.
+            isVisible = false
             text("Fugu isn't set up yet — install Codex, configure the provider, and add your API key.")
             createActionLabel("Set up Fugu") { openSetup() }
             createActionLabel("Get API key") { BrowserUtil.browse(FuguSecrets.CONSOLE_KEYS_URL) }
@@ -220,19 +222,27 @@ class FuguChatPanel(
         }
 
     private fun refreshSetupBanner() {
-        setupBanner.isVisible = !FuguSetup.isReady()
-        setupBanner.text(setupBannerText())
-        northPanel.revalidate()
-        northPanel.repaint()
-    }
-
-    private fun setupBannerText(): String {
-        val missing = buildList {
-            if (!FuguSetup.codexInstalled()) add("Codex CLI")
-            if (!FuguSetup.providerConfigured()) add("Sakana provider")
-            if (!FuguSetup.apiKeyPresent()) add("API key")
+        // FuguSetup probes PasswordSafe (macOS Keychain) and reads files — both can block
+        // for seconds and MUST NOT run on the EDT (they froze the IDE on tool-window open).
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val codex = FuguSetup.codexInstalled()
+            val provider = FuguSetup.providerConfigured()
+            val key = FuguSetup.apiKeyPresent()
+            val missing = buildList {
+                if (!codex) add("Codex CLI")
+                if (!provider) add("Sakana provider")
+                if (!key) add("API key")
+            }
+            ApplicationManager.getApplication().invokeLater({
+                if (project.isDisposed) return@invokeLater
+                setupBanner.isVisible = missing.isNotEmpty()
+                if (missing.isNotEmpty()) {
+                    setupBanner.text("Fugu setup incomplete — missing: ${missing.joinToString(", ")}.")
+                }
+                northPanel.revalidate()
+                northPanel.repaint()
+            }, ModalityState.any())
         }
-        return "Fugu setup incomplete — missing: ${missing.joinToString(", ")}."
     }
 
     private fun openSetup() {
@@ -259,8 +269,8 @@ class FuguChatPanel(
 
     /** Fetches the account's available models from Sakana and fills the model dropdown. */
     private fun loadModels() {
-        val key = FuguSecrets.getApiKey() ?: return
         ApplicationManager.getApplication().executeOnPooledThread {
+            val key = FuguSecrets.getApiKey() ?: return@executeOnPooledThread  // PasswordSafe — off EDT
             val models = SakanaApi.listModels(key).getOrNull()
                 ?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: return@executeOnPooledThread
             ApplicationManager.getApplication().invokeLater({

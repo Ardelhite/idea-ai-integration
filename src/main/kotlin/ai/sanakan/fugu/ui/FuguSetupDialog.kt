@@ -51,10 +51,9 @@ class FuguSetupDialog(private val project: Project) : DialogWrapper(project) {
     init {
         title = "Set up Karato"
         setOKButtonText("Done")
-        apiKeyField.text = FuguSecrets.getApiKey() ?: ""
         wire()
         init()
-        refreshStatus()
+        refreshStatus() // async — also loads the stored key into the field
     }
 
     override fun createCenterPanel(): JComponent {
@@ -172,18 +171,25 @@ class FuguSetupDialog(private val project: Project) : DialogWrapper(project) {
     // --- status ----------------------------------------------------------------
 
     private fun refreshStatus() {
-        val codex = CodexInstaller.resolve()
-        setStatus(codexStatus, codex?.let { "Installed: ${it.path}" } ?: "Not found", ok = codex != null)
-
-        val configured = CodexConfig.hasSakanaProvider()
-        setStatus(
-            providerStatus,
-            if (configured) "Configured (${CodexConfig.configFile().path})" else "Not configured",
-            ok = configured,
-        )
-
-        if (FuguSecrets.getApiKey() != null && keyStatus.text.isNullOrBlank()) {
-            setStatus(keyStatus, "Key stored (click Verify to check)", ok = null)
+        // PATH lookup, config.toml read and PasswordSafe (Keychain) can each block for
+        // seconds — do them off the EDT, then update labels/field on the EDT.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val codex = CodexInstaller.resolve()
+            val configured = CodexConfig.hasSakanaProvider()
+            val configPath = CodexConfig.configFile().path
+            val storedKey = FuguSecrets.getApiKey()
+            ApplicationManager.getApplication().invokeLater({
+                setStatus(codexStatus, codex?.let { "Installed: ${it.path}" } ?: "Not found", ok = codex != null)
+                setStatus(
+                    providerStatus,
+                    if (configured) "Configured ($configPath)" else "Not configured",
+                    ok = configured,
+                )
+                if (storedKey != null) {
+                    if (apiKeyField.password.isEmpty()) apiKeyField.text = storedKey
+                    if (keyStatus.text.isNullOrBlank()) setStatus(keyStatus, "Key stored (click Verify to check)", ok = null)
+                }
+            }, ModalityState.any())
         }
     }
 

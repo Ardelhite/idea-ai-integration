@@ -70,6 +70,9 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
+              <li><b>0.1.1</b> — Fix an IDE freeze on tool-window open: the setup probe
+                  (PasswordSafe/Keychain + file checks) and model fetch now run off the
+                  UI thread.</li>
               <li><b>0.1.0</b> — Initial release. Multi-tab chat tool window for the
                   Sakana AI Fugu agent (via the Codex CLI): inline tool cards,
                   interactive approvals, GUI-only setup, Claude/Codex project-file
