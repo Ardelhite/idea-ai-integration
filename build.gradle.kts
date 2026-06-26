@@ -95,6 +95,18 @@ tasks {
                 "# Karato sandbox\n\nA throwaway project for testing the Karato plugin.\n",
             )
             File(dir, "hello.txt").writeText("edit me\n")
+            // A project-scoped MCP server (Claude `.mcp.json` format) so the MCP-scope
+            // dropdown has something to mirror into Codex. Playwright is a local stdio
+            // launcher (no auth) — handy for testing.
+            File(dir, ".mcp.json").writeText(
+                """
+                {
+                  "mcpServers": {
+                    "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] }
+                  }
+                }
+                """.trimIndent() + "\n",
+            )
 
             // The bundled Gradle plugin's JVM-support matrix crashes parsing JDK 25 on
             // 2024.2.x (GradleJvmSupportMatrix → JavaVersion.parse("25"), owned by plugin
