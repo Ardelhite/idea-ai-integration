@@ -43,6 +43,8 @@ class FuguConfigurable : Configurable {
     }
     private val sakanaProviderCheck =
         JBCheckBox("Add Sakana provider override (-c model_provider=sakana)")
+    private val loadAgentContextCheck =
+        JBCheckBox("Load Claude/Codex project files (CLAUDE.md, .claude/, project memory)")
     private val apiKeyField = JBPasswordField().apply { columns = 30 }
     private val apiKeyLink = HyperlinkLabel("Create an API key at console.sakana.ai").apply {
         addHyperlinkListener { BrowserUtil.browse(FuguSecrets.CONSOLE_KEYS_URL) }
@@ -62,6 +64,7 @@ class FuguConfigurable : Configurable {
             .addLabeledComponent("Permission mode:", permissionCombo, true)
             .addLabeledComponent("Send shortcut:", sendShortcutCombo, true)
             .addComponent(sakanaProviderCheck)
+            .addComponent(loadAgentContextCheck)
             .addLabeledComponent("Sakana API key:", apiKeyField, true)
             .addComponentToRightColumn(apiKeyLink)
             .addLabeledComponent("Extra CLI args:", extraArgsField, true)
@@ -80,6 +83,7 @@ class FuguConfigurable : Configurable {
             (permissionCombo.selectedItem as FuguPermissionMode).name != s.permissionMode ||
             (sendShortcutCombo.selectedItem as SendShortcut).name != s.sendShortcut ||
             sakanaProviderCheck.isSelected != s.sakanaProvider ||
+            loadAgentContextCheck.isSelected != s.loadAgentContext ||
             String(apiKeyField.password) != loadedKey ||
             extraArgsField.text != s.extraArgs
     }
@@ -92,6 +96,7 @@ class FuguConfigurable : Configurable {
         s.permissionMode = (permissionCombo.selectedItem as FuguPermissionMode).name
         s.sendShortcut = (sendShortcutCombo.selectedItem as SendShortcut).name
         s.sakanaProvider = sakanaProviderCheck.isSelected
+        s.loadAgentContext = loadAgentContextCheck.isSelected
         s.extraArgs = extraArgsField.text.trim()
 
         val key = String(apiKeyField.password)
@@ -110,6 +115,7 @@ class FuguConfigurable : Configurable {
         permissionCombo.selectedItem = s.permissionModeEnum
         sendShortcutCombo.selectedItem = s.sendShortcutEnum
         sakanaProviderCheck.isSelected = s.sakanaProvider
+        loadAgentContextCheck.isSelected = s.loadAgentContext
         extraArgsField.text = s.extraArgs
 
         loadedKey = FuguSecrets.getApiKey() ?: ""

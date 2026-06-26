@@ -56,6 +56,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     private var currentAssistant: ChatMessage? = null
     private var turnActive = false
 
+    /** Project agent files (CLAUDE.md etc.) are injected once per Codex thread. */
+    private var agentContextSent = false
+
     /** Item id of the message currently being streamed, to detect message boundaries. */
     private var streamingItemId: String? = null
     private var streamingTextBlock: TextBlock? = null
@@ -101,9 +104,21 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         notify { it.onTurnStarted() }
         notify { it.onStatus("Fugu is working…") }
 
-        // Process launch can block briefly; keep it off the EDT.
+        val injectContext = !agentContextSent && FuguSettings.getInstance().loadAgentContext
+        if (injectContext) agentContextSent = true
+
+        // Process launch + file reads can block; keep them off the EDT.
         ApplicationManager.getApplication().executeOnPooledThread {
-            client.send(trimmed, model)
+            val prompt = if (injectContext) {
+                val ctx = AgentContext.collect(project)
+                if (ctx.files.isNotEmpty()) {
+                    onEdt { notify { it.onStatus("Loaded ${ctx.files.size} project agent file(s): ${ctx.files.joinToString(", ")}") } }
+                }
+                if (ctx.text.isBlank()) trimmed else "${ctx.text}\n\n----\n\n$trimmed"
+            } else {
+                trimmed
+            }
+            client.send(prompt, model)
         }
     }
 
@@ -121,6 +136,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         streamingItemId = null
         streamingTextBlock = null
         sessionOutputTokens = 0L
+        agentContextSent = false
         notify { it.onStatus("New conversation") }
     }
 
@@ -301,6 +317,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         clientRef?.restoreThread(state.threadId)
         messages.clear()
         state.messages.forEach { messages.add(it.toRuntime()) }
+        // A resumed thread already carries its injected context; only a tab that
+        // never ran a turn should inject on its first send.
+        agentContextSent = messages.isNotEmpty()
     }
 
     private fun refreshProjectFiles() {

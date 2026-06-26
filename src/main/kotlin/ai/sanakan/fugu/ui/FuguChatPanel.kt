@@ -121,6 +121,13 @@ class FuguChatPanel(
     private val northPanel = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
 
     init {
+        // Offset the chat from the IDE with a margin + frame so it doesn't visually
+        // merge with the editor (both share the editor background colour).
+        border = JBUI.Borders.compound(
+            JBUI.Borders.empty(5),
+            JBUI.Borders.customLine(JBColor.border(), 1),
+        )
+
         northPanel.add(buildToolbar())
         northPanel.add(setupBanner)
         add(northPanel, BorderLayout.NORTH)

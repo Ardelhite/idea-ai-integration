@@ -82,6 +82,9 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
     /** Extra args appended verbatim to every `codex exec` invocation. */
     var extraArgs: String = ""
 
+    /** Inject Claude/Codex project files (CLAUDE.md, .claude/, memory) at thread start. */
+    var loadAgentContext: Boolean = true
+
     /** Which keystroke submits the message, stored by enum name. */
     var sendShortcut: String = SendShortcut.ENTER.name
 
