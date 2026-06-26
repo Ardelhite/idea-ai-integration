@@ -592,8 +592,12 @@ class FuguChatPanel(
     }
 
     private companion object {
-        /** ASCII spinner frames shown next to a running tab's number. */
-        val TAB_SPINNER = arrayOf("|", "/", "-", "\\")
+        /**
+         * Spinner frames shown next to a running tab's number. Braille cells all
+         * have the same advance width, so the tab width stays fixed as it spins
+         * (unlike | / - \, which jitter in a proportional font).
+         */
+        val TAB_SPINNER = arrayOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
     }
 }
 
