@@ -36,9 +36,6 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         fun onTurnFinished()
         fun onStatus(text: String)
 
-        /** The tab title changed (e.g. derived from the first user prompt). */
-        fun onTitleChanged(title: String) {}
-
         /** The agent wants a structured answer; render it inline and call [respond] once. */
         fun onUserPrompt(prompt: UserPrompt, respond: (PromptAction, Map<String, List<String>>) -> Unit) {}
 
@@ -49,10 +46,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     private val listeners = CopyOnWriteArrayList<Listener>()
     val messages = mutableListOf<ChatMessage>()
 
-    /** Tab label; defaults to "Chat" and is derived from the first user prompt. */
-    var title: String = "Chat"
+    /** Tab label; a sequential number assigned by [FuguSessionManager]. */
+    var title: String = "1"
         private set
-    private var titlePinned = false
 
     /** Selected model for this session; defaults from settings, changeable in UI. */
     var model: String = FuguSettings.getInstance().model
@@ -99,12 +95,6 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         val userMsg = ChatMessage(ChatRole.USER, trimmed)
         messages.add(userMsg)
         notify { it.onMessageAdded(userMsg) }
-
-        if (!titlePinned) {
-            title = deriveTitle(trimmed)
-            titlePinned = true
-            notify { it.onTitleChanged(title) }
-        }
 
         turnActive = true
         currentAssistant = null
@@ -307,18 +297,10 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
 
     fun restoreState(state: FuguSessionState) {
         title = state.title
-        titlePinned = true
         pendingThreadId = state.threadId
         clientRef?.restoreThread(state.threadId)
         messages.clear()
         state.messages.forEach { messages.add(it.toRuntime()) }
-    }
-
-    /** First line of the first prompt, trimmed to a tab-sized label. */
-    private fun deriveTitle(prompt: String): String {
-        val firstLine = prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-        if (firstLine.isEmpty()) return title
-        return if (firstLine.length <= 24) firstLine else firstLine.take(23).trimEnd() + "…"
     }
 
     private fun refreshProjectFiles() {

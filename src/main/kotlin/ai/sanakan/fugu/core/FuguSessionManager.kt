@@ -27,10 +27,10 @@ class FuguSessionManager(private val project: Project) : Disposable, PersistentS
     /** Live, ordered list of open chat tabs. */
     val sessions: List<FuguSession> get() = sessionList
 
-    /** Creates a new tab with a unique default title and returns it. */
+    /** Creates a new tab with the smallest unused number as its title. */
     fun create(): FuguSession {
         val session = FuguSession(project)
-        session.assignTitle(uniqueDefaultTitle())
+        session.assignTitle(nextNumber().toString())
         sessionList.add(session)
         return session
     }
@@ -45,11 +45,11 @@ class FuguSessionManager(private val project: Project) : Disposable, PersistentS
         if (sessionList.remove(session)) session.dispose()
     }
 
-    private fun uniqueDefaultTitle(): String {
-        if (sessionList.none { it.title == "Chat" }) return "Chat"
-        var n = 2
-        while (sessionList.any { it.title == "Chat $n" }) n++
-        return "Chat $n"
+    private fun nextNumber(): Int {
+        val used = sessionList.mapNotNull { it.title.toIntOrNull() }.toSet()
+        var n = 1
+        while (n in used) n++
+        return n
     }
 
     override fun getState(): FuguManagerState = FuguManagerState().also { st ->
@@ -64,6 +64,8 @@ class FuguSessionManager(private val project: Project) : Disposable, PersistentS
             session.restoreState(persisted)
             sessionList.add(session)
         }
+        // Always present tabs as a clean 1..N sequence.
+        sessionList.forEachIndexed { i, s -> s.assignTitle((i + 1).toString()) }
     }
 
     override fun dispose() {

@@ -99,6 +99,14 @@ class FuguChatPanel(
         alignmentX = Component.CENTER_ALIGNMENT
     }
     private val onSettingsChanged = Runnable { ApplicationManager.getApplication().invokeLater({ if (!project.isDisposed) refreshSendHint() }, ModalityState.any()) }
+
+    // Spins an ASCII frame beside the tab number while this tab's turn is running.
+    private var tabSpinnerFrame = 0
+    private val tabSpinnerTimer = Timer(120) {
+        tabSpinnerFrame = (tabSpinnerFrame + 1) % TAB_SPINNER.size
+        onRename("${session.title} ${TAB_SPINNER[tabSpinnerFrame]}")
+    }
+
     private val statusBar = StatusBar()
     private val promptArea = JPanel(BorderLayout()).apply { isVisible = false }
     private val statusLabel = JBLabel("").apply {
@@ -487,10 +495,6 @@ class FuguChatPanel(
         statusLabel.text = text
     }
 
-    override fun onTitleChanged(title: String) {
-        onRename(title)
-    }
-
     override fun onUserPrompt(
         prompt: ai.sanakan.fugu.cli.UserPrompt,
         respond: (ai.sanakan.fugu.cli.PromptAction, Map<String, List<String>>) -> Unit,
@@ -548,6 +552,13 @@ class FuguChatPanel(
     private fun updateBusyState(busy: Boolean) {
         sendButton.running = busy
         statusBar.running = busy
+        if (busy) {
+            if (!tabSpinnerTimer.isRunning) { tabSpinnerFrame = 0; tabSpinnerTimer.start() }
+            onRename("${session.title} ${TAB_SPINNER[0]}")
+        } else {
+            tabSpinnerTimer.stop()
+            onRename(session.title)
+        }
     }
 
     private fun scrollToBottom() {
@@ -576,7 +587,13 @@ class FuguChatPanel(
     override fun dispose() {
         session.removeListener(this)
         FuguSettings.removeChangeListener(onSettingsChanged)
+        tabSpinnerTimer.stop()
         statusBar.stop()
+    }
+
+    private companion object {
+        /** ASCII spinner frames shown next to a running tab's number. */
+        val TAB_SPINNER = arrayOf("|", "/", "-", "\\")
     }
 }
 

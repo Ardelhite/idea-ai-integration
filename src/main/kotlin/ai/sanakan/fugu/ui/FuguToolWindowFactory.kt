@@ -25,14 +25,17 @@ class FuguToolWindowFactory : ToolWindowFactory, DumbAware {
         val factory = ContentFactory.getInstance()
 
         fun openTab(session: FuguSession, select: Boolean) {
-            lateinit var content: Content
+            // Holder so onRename is safe even if invoked during panel construction
+            // (before the Content exists); the title falls back to the factory value.
+            val contentRef = arrayOfNulls<Content>(1)
             val panel = FuguChatPanel(
                 project = project,
                 session = session,
                 onNewTab = { openTab(manager.create(), true) },
-                onRename = { title -> content.displayName = title },
+                onRename = { title -> contentRef[0]?.displayName = title },
             )
-            content = factory.createContent(panel, session.title, false)
+            val content = factory.createContent(panel, session.title, false)
+            contentRef[0] = content
             content.isCloseable = true
             content.setDisposer(panel)
             cm.addContent(content)
