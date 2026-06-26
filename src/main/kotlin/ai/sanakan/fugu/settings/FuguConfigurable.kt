@@ -3,6 +3,7 @@ package ai.sanakan.fugu.settings
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
@@ -23,25 +24,28 @@ import javax.swing.JPanel
 class FuguConfigurable : Configurable {
 
     private val transportCombo = ComboBox(DefaultComboBoxModel(FuguTransportKind.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create("") { it.display }
+        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
     }
     private val cliPathField = TextFieldWithBrowseButton().apply {
         textField.columns = 30
-        addBrowseFolderListener(
-            "Select the Codex CLI",
-            "Path to the codex / codex-fugu executable (or a mock under tools/)",
-            null,
-            FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor(),
-        )
+        // Use FileChooser directly: the addBrowseFolderListener(title, desc, …) overload is
+        // scheduled for removal, and its replacement isn't available on our 2024.2 baseline.
+        addActionListener {
+            val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().apply {
+                title = "Select the Codex CLI"
+                description = "Path to the codex / codex-fugu executable (or a mock under tools/)"
+            }
+            FileChooser.chooseFile(descriptor, null, null)?.let { text = it.path }
+        }
     }
     private val modelCombo = ComboBox(DefaultComboBoxModel(FuguSettings.KNOWN_MODELS.toTypedArray())).apply {
         isEditable = true
     }
     private val permissionCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create("") { it.display }
+        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
     }
     private val sendShortcutCombo = ComboBox(DefaultComboBoxModel(SendShortcut.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create("") { it.display }
+        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
     }
     private val sakanaProviderCheck =
         JBCheckBox("Add Sakana provider override (-c model_provider=sakana)")

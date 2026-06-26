@@ -1,0 +1,395 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - banner [ref=e6]:
+      - generic [ref=e8]:
+        - link "Marketplace Logo" [ref=e10] [cursor=pointer]:
+          - /url: /
+          - img "Marketplace Logo" [ref=e13]
+        - generic [ref=e15]:
+          - generic [ref=e20] [cursor=pointer]: Edu Courses
+          - generic [ref=e22]:
+            - link "Themes" [ref=e23] [cursor=pointer]:
+              - /url: /search?products=idea&includeTags=theme
+            - link "Plugin Ideas" [ref=e24] [cursor=pointer]:
+              - /url: /plugin-ideas
+            - link "Build Plugins" [ref=e25] [cursor=pointer]:
+              - /url: /developers
+          - generic [ref=e37] [cursor=pointer]: harima42
+          - img [ref=e43] [cursor=pointer]
+          - img [ref=e47] [cursor=pointer]
+  - main [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e53]:
+        - generic [ref=e55]:
+          - img "plugin icon" [ref=e57]
+          - generic [ref=e58]:
+            - heading "Karato - Agent for Sakana AI fugu" [level=3] [ref=e59]
+            - link "Imperial architects" [ref=e61] [cursor=pointer]:
+              - /url: /vendor/imperial-architects
+        - generic [ref=e63]:
+          - button [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+          - link "Preview" [ref=e71] [cursor=pointer]:
+            - /url: /plugin/32504-karato--agent-for-sakana-ai-fugu/versions?noRedirect=true
+            - img [ref=e72]
+            - generic [ref=e74]: Preview
+          - button "Upload Update" [ref=e76] [cursor=pointer]
+          - button [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+      - generic [ref=e82]:
+        - generic [ref=e85]:
+          - generic:
+            - generic:
+              - img
+          - generic [ref=e87]:
+            - tab "Overview" [ref=e88] [cursor=pointer]:
+              - generic [ref=e89]: Overview
+            - tab "Versions" [ref=e90]:
+              - generic [ref=e91]: Versions
+            - tab "Reviews" [ref=e92] [cursor=pointer]:
+              - generic [ref=e93]: Reviews
+            - tab "Custom Pages" [ref=e94] [cursor=pointer]:
+              - generic [ref=e95]: Custom Pages
+            - tab "Analytics" [ref=e97] [cursor=pointer]:
+              - generic [ref=e98]: Analytics
+            - tab "Monetization" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: Monetization
+          - generic:
+            - generic:
+              - img
+        - generic [ref=e104]:
+          - list [ref=e107]:
+            - listitem [ref=e108] [cursor=pointer]:
+              - link "0.1.0 26 Jun 2026" [ref=e110]:
+                - /url: /plugin/32504-karato--agent-for-sakana-ai-fugu/edit/versions/stable/1088203
+                - generic [ref=e111]:
+                  - generic [ref=e112]: 0.1.0
+                  - generic [ref=e113]: 26 Jun 2026
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - heading "0.1.0" [level=2] [ref=e119]
+              - generic [ref=e121]:
+                - button [ref=e124] [cursor=pointer]:
+                  - img [ref=e125]
+                - button [ref=e129] [cursor=pointer]:
+                  - img [ref=e130]
+                - link [ref=e134] [cursor=pointer]:
+                  - /url: /plugin/download?rel=true&updateId=1088203
+                  - img [ref=e135]
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - generic [ref=e140]:
+                  - generic [ref=e141]: Status
+                  - generic [ref=e142]: Approved
+                - generic [ref=e143]:
+                  - generic [ref=e144]:
+                    - generic [ref=e145]: Date
+                    - generic [ref=e146]: 26 Jun 2026
+                  - generic [ref=e147]:
+                    - generic [ref=e148]: Compatibility Range
+                    - generic [ref=e149]:
+                      - generic [ref=e150]: 242.0+
+                      - img [ref=e151] [cursor=pointer]
+                - generic [ref=e153]:
+                  - generic [ref=e154]:
+                    - generic [ref=e155]: Size
+                    - generic [ref=e156]: 1.34 MB
+                  - generic [ref=e157]:
+                    - generic [ref=e158]: Uploaded by
+                    - link "harima42" [ref=e160] [cursor=pointer]:
+                      - /url: /author/6937e88c-f44a-45d9-9138-e059c365aa8f
+              - generic [ref=e162]:
+                - generic "Total version downloads" [ref=e163]: "Version downloads: 0"
+                - generic "Version downloads for last month" [ref=e164]:
+                  - img [ref=e165]
+            - separator [ref=e166]
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - heading "Compatibility verification" [level=3] [ref=e170]
+                - img [ref=e172]
+              - generic [ref=e175]:
+                - generic [ref=e177]:
+                  - generic [ref=e178]: Status
+                  - generic [ref=e179]: Product name
+                  - generic [ref=e180]:
+                    - text: Version
+                    - img [ref=e181]
+                  - generic [ref=e183]: Date
+                  - generic [ref=e184]: Verifier
+                  - img [ref=e186]
+                  - generic [ref=e188]: Verification verdict
+                  - generic [ref=e189]: Actions
+                - group [ref=e190]:
+                  - generic "Success IntelliJ IDEA 2026.2 eap (262.8377.35) 26 Jun 2026 21:42 IDE No issues occurred during the IDE run with the plugin installed" [ref=e191]:
+                    - img [ref=e192]
+                    - generic [ref=e196] [cursor=pointer]:
+                      - generic [ref=e198]: Success
+                      - generic [ref=e199]: IntelliJ IDEA
+                      - generic "2026.2 eap (262.8377.35)" [ref=e200]
+                      - generic [ref=e201]:
+                        - generic [ref=e202]: 26 Jun 2026
+                        - generic [ref=e203]: 21:42
+                      - generic [ref=e205]: IDE
+                      - generic "No issues occurred during the IDE run with the plugin installed" [ref=e206]
+                - group [ref=e207]:
+                  - generic "Warnings IntelliJ IDEA 2026.2 eap (262.8377.35) 26 Jun 2026 21:41 1.405 1 compatibility warning. 3 usages of scheduled for removal API and 9 usages of deprecated API" [ref=e208]:
+                    - img [ref=e209]
+                    - generic [ref=e213] [cursor=pointer]:
+                      - generic [ref=e215]: Warnings
+                      - generic [ref=e216]: IntelliJ IDEA
+                      - generic "2026.2 eap (262.8377.35)" [ref=e217]
+                      - generic [ref=e218]:
+                        - generic [ref=e219]: 26 Jun 2026
+                        - generic [ref=e220]: 21:41
+                      - generic [ref=e221]: "1.405"
+                      - generic "1 compatibility warning. 3 usages of scheduled for removal API and 9 usages of deprecated API" [ref=e222]
+                  - generic [ref=e498]:
+                    - group [ref=e499]:
+                      - generic "3 usages of scheduled for removal API" [active] [ref=e500]:
+                        - img [ref=e501]
+                        - generic [ref=e504] [cursor=pointer]: 3 usages of scheduled for removal API
+                      - generic [ref=e530]:
+                        - paragraph [ref=e531]:
+                          - generic [ref=e532]: Karato - Agent for Sakana AI fugu 0.1.0
+                          - text: uses API scheduled for removal in future releases
+                        - group [ref=e534]:
+                          - generic "Scheduled for removal methods usages (3)" [ref=e535]:
+                            - img [ref=e536]
+                            - generic [ref=e539] [cursor=pointer]:
+                              - text: Scheduled for removal methods usages
+                              - generic [ref=e540]: (3)
+                    - group [ref=e505]:
+                      - generic "9 deprecated API usages" [ref=e506]:
+                        - img [ref=e507]
+                        - generic [ref=e510] [cursor=pointer]: 9 deprecated API usages
+                    - group [ref=e511]:
+                      - generic "1 compatibility warning" [ref=e512]:
+                        - img [ref=e513]
+                        - generic [ref=e516] [cursor=pointer]: 1 compatibility warning
+                    - group [ref=e517]:
+                      - generic "Dependencies used" [ref=e518]:
+                        - img [ref=e519]
+                        - generic [ref=e522] [cursor=pointer]: Dependencies used
+                    - group [ref=e523]:
+                      - generic "Plugin can probably be enabled or disabled without IDE restart" [ref=e524]:
+                        - img [ref=e525]
+                        - generic [ref=e528] [cursor=pointer]: Plugin can probably be enabled or disabled without IDE restart
+                - group [ref=e223]:
+                  - generic "Warnings IntelliJ IDEA 2025.3.6 26 Jun 2026 21:41 1.405 1 compatibility warning. 1 usage of scheduled for removal API and 8 usages of deprecated API" [ref=e224]:
+                    - img [ref=e225]
+                    - generic [ref=e229] [cursor=pointer]:
+                      - generic [ref=e231]: Warnings
+                      - generic [ref=e232]: IntelliJ IDEA
+                      - generic "2025.3.6" [ref=e233]
+                      - generic [ref=e234]:
+                        - generic [ref=e235]: 26 Jun 2026
+                        - generic [ref=e236]: 21:41
+                      - generic [ref=e237]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of scheduled for removal API and 8 usages of deprecated API" [ref=e238]
+                - group [ref=e239]:
+                  - generic "Warnings IntelliJ IDEA 2025.2.6.2 26 Jun 2026 21:40 1.405 1 compatibility warning. 1 usage of scheduled for removal API and 8 usages of deprecated API" [ref=e240]:
+                    - img [ref=e241]
+                    - generic [ref=e245] [cursor=pointer]:
+                      - generic [ref=e247]: Warnings
+                      - generic [ref=e248]: IntelliJ IDEA
+                      - generic "2025.2.6.2" [ref=e249]
+                      - generic [ref=e250]:
+                        - generic [ref=e251]: 26 Jun 2026
+                        - generic [ref=e252]: 21:40
+                      - generic [ref=e253]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of scheduled for removal API and 8 usages of deprecated API" [ref=e254]
+                - group [ref=e255]:
+                  - generic "Warnings IntelliJ IDEA 2025.1.7.1 26 Jun 2026 21:40 1.405 1 compatibility warning. 1 usage of scheduled for removal API and 2 usages of deprecated API" [ref=e256]:
+                    - img [ref=e257]
+                    - generic [ref=e261] [cursor=pointer]:
+                      - generic [ref=e263]: Warnings
+                      - generic [ref=e264]: IntelliJ IDEA
+                      - generic "2025.1.7.1" [ref=e265]
+                      - generic [ref=e266]:
+                        - generic [ref=e267]: 26 Jun 2026
+                        - generic [ref=e268]: 21:40
+                      - generic [ref=e269]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of scheduled for removal API and 2 usages of deprecated API" [ref=e270]
+                - group [ref=e271]:
+                  - generic "Warnings IntelliJ IDEA 2024.3.7.1 26 Jun 2026 21:40 1.405 1 compatibility warning. 1 usage of scheduled for removal API and 2 usages of deprecated API" [ref=e272]:
+                    - img [ref=e273]
+                    - generic [ref=e277] [cursor=pointer]:
+                      - generic [ref=e279]: Warnings
+                      - generic [ref=e280]: IntelliJ IDEA
+                      - generic "2024.3.7.1" [ref=e281]
+                      - generic [ref=e282]:
+                        - generic [ref=e283]: 26 Jun 2026
+                        - generic [ref=e284]: 21:40
+                      - generic [ref=e285]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of scheduled for removal API and 2 usages of deprecated API" [ref=e286]
+                - group [ref=e287]:
+                  - generic "Warnings IntelliJ IDEA 2024.2.6 26 Jun 2026 21:40 1.405 1 compatibility warning. 1 usage of deprecated API" [ref=e288]:
+                    - img [ref=e289]
+                    - generic [ref=e293] [cursor=pointer]:
+                      - generic [ref=e295]: Warnings
+                      - generic [ref=e296]: IntelliJ IDEA
+                      - generic "2024.2.6" [ref=e297]
+                      - generic [ref=e298]:
+                        - generic [ref=e299]: 26 Jun 2026
+                        - generic [ref=e300]: 21:40
+                      - generic [ref=e301]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of deprecated API" [ref=e302]
+                - group [ref=e303]:
+                  - generic "Warnings IntelliJ IDEA (261.26222.22) 26 Jun 2026 21:41 1.405 1 compatibility warning. 1 usage of scheduled for removal API and 9 usages of deprecated API" [ref=e304]:
+                    - img [ref=e305]
+                    - generic [ref=e309] [cursor=pointer]:
+                      - generic [ref=e311]: Warnings
+                      - generic [ref=e312]: IntelliJ IDEA
+                      - generic "(261.26222.22)" [ref=e313]
+                      - generic [ref=e314]:
+                        - generic [ref=e315]: 26 Jun 2026
+                        - generic [ref=e316]: 21:41
+                      - generic [ref=e317]: "1.405"
+                      - generic "1 compatibility warning. 1 usage of scheduled for removal API and 9 usages of deprecated API" [ref=e318]
+              - heading "Schedule Verification" [level=4] [ref=e319]
+              - generic [ref=e320]: Verifications take approximately 10 to 15 minutes
+              - generic [ref=e322]:
+                - generic [ref=e323]:
+                  - generic [ref=e324]: IDE
+                  - generic [ref=e327] [cursor=pointer]:
+                    - generic [ref=e329]: IntelliJ IDEA
+                    - img [ref=e331]
+                - generic [ref=e333]:
+                  - generic [ref=e334]: Build number
+                  - generic [ref=e337] [cursor=pointer]:
+                    - generic [ref=e339]: 2026.2 eap (262.8377.35)
+                    - img [ref=e341]
+                - generic [ref=e343]:
+                  - generic [ref=e344]: Verification type
+                  - generic [ref=e347] [cursor=pointer]:
+                    - generic [ref=e349]: IntelliJ Plugin Verifier
+                    - img [ref=e351]
+                - button "Schedule Verification" [ref=e354] [cursor=pointer]
+            - separator [ref=e355]
+            - generic [ref=e357]:
+              - generic [ref=e358]: What’s New
+              - list [ref=e363]:
+                - listitem [ref=e364]: "• 0.1.0 — Initial release. Multi-tab chat tool window for the Sakana AI Fugu agent (via the Codex CLI): inline tool cards, interactive approvals, GUI-only setup, Claude/Codex project-file awareness (CLAUDE.md, .claude/, memory) and MCP-server mirroring."
+            - generic [ref=e366]:
+              - separator [ref=e367]
+              - generic [ref=e369]:
+                - generic [ref=e371]: Dependencies defined in plugin.xml
+                - generic [ref=e372]:
+                  - generic [ref=e373]: For more information see
+                  - link "Plugin Compatibility Guide" [ref=e374] [cursor=pointer]:
+                    - /url: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
+                - table [ref=e376]:
+                  - rowgroup [ref=e377]:
+                    - row "com.intellij.modules.platform" [ref=e378]:
+                      - cell "com.intellij.modules.platform" [ref=e379]
+                      - cell [ref=e380]
+            - separator [ref=e381]
+            - generic [ref=e383]:
+              - generic [ref=e384]:
+                - generic [ref=e386]: Products
+                - generic [ref=e387]: The list of supported products was determined by dependencies defined in the plugin.xml
+              - generic [ref=e388]:
+                - generic [ref=e389]:
+                  - heading "Supported Products" [level=4] [ref=e390]
+                  - table [ref=e391]:
+                    - rowgroup [ref=e392]:
+                      - row "PyCharm Community 2024.2+" [ref=e393]:
+                        - cell "PyCharm Community" [ref=e394]
+                        - cell "2024.2+" [ref=e395]
+                      - row "WebStorm 2024.2+" [ref=e396]:
+                        - cell "WebStorm" [ref=e397]
+                        - cell "2024.2+" [ref=e398]
+                      - row "RustRover 2024.2+" [ref=e399]:
+                        - cell "RustRover" [ref=e400]
+                        - cell "2024.2+" [ref=e401]
+                      - row "Code With Me Guest 1.0+" [ref=e402]:
+                        - cell "Code With Me Guest" [ref=e403]
+                        - cell "1.0+" [ref=e404]
+                      - row "IntelliJ IDEA Community 2024.2+" [ref=e405]:
+                        - cell "IntelliJ IDEA Community" [ref=e406]
+                        - cell "2024.2+" [ref=e407]
+                      - row "CLion 2024.2+" [ref=e408]:
+                        - cell "CLion" [ref=e409]
+                        - cell "2024.2+" [ref=e410]
+                      - row "JetBrains Client 1.0+" [ref=e411]:
+                        - cell "JetBrains Client" [ref=e412]
+                        - cell "1.0+" [ref=e413]
+                      - row "Android Studio Ladybug | 2024.2.1+" [ref=e414]:
+                        - cell "Android Studio" [ref=e415]
+                        - cell "Ladybug | 2024.2.1+" [ref=e416]
+                      - row "DataGrip 2024.2+" [ref=e417]:
+                        - cell "DataGrip" [ref=e418]
+                        - cell "2024.2+" [ref=e419]
+                      - row "JetBrains Gateway 2024.2+" [ref=e420]:
+                        - cell "JetBrains Gateway" [ref=e421]
+                        - cell "2024.2+" [ref=e422]
+                      - row "Rider 2024.2+" [ref=e423]:
+                        - cell "Rider" [ref=e424]
+                        - cell "2024.2+" [ref=e425]
+                      - row "PhpStorm 2024.2+" [ref=e426]:
+                        - cell "PhpStorm" [ref=e427]
+                        - cell "2024.2+" [ref=e428]
+                      - row "PyCharm 2024.2+" [ref=e429]:
+                        - cell "PyCharm" [ref=e430]
+                        - cell "2024.2+" [ref=e431]
+                      - row "DataSpell 2024.2+" [ref=e432]:
+                        - cell "DataSpell" [ref=e433]
+                        - cell "2024.2+" [ref=e434]
+                      - row "GoLand 2024.2+" [ref=e435]:
+                        - cell "GoLand" [ref=e436]
+                        - cell "2024.2+" [ref=e437]
+                      - row "MPS 2024.3+" [ref=e438]:
+                        - cell "MPS" [ref=e439]
+                        - cell "2024.3+" [ref=e440]
+                      - row "IntelliJ IDEA 2024.2+" [ref=e441]:
+                        - cell "IntelliJ IDEA" [ref=e442]
+                        - cell "2024.2+" [ref=e443]
+                      - row "RubyMine 2024.2+" [ref=e444]:
+                        - cell "RubyMine" [ref=e445]
+                        - cell "2024.2+" [ref=e446]
+                - generic [ref=e447]:
+                  - heading "Unsupported Products" [level=3] [ref=e448]
+                  - group [ref=e450]:
+                    - generic "AppCode" [ref=e451]:
+                      - img [ref=e452]
+                      - generic [ref=e454]: AppCode
+  - contentinfo [ref=e455]:
+    - generic [ref=e457]:
+      - generic [ref=e459]:
+        - link "JetBrains Marketplace on X (Twitter)" [ref=e460] [cursor=pointer]:
+          - /url: https://twitter.com/JBPlatform
+          - img [ref=e461]
+        - link "JetBrains Marketplace on Bluesky" [ref=e463] [cursor=pointer]:
+          - /url: https://bsky.app/profile/platform.jetbrains.com
+          - img [ref=e464]
+        - link "JetBrains Marketplace blog" [ref=e466] [cursor=pointer]:
+          - /url: https://blog.jetbrains.com/platform
+          - img [ref=e467]
+        - link "JetBrains Marketplace Issue Tracker" [ref=e469] [cursor=pointer]:
+          - /url: https://youtrack.jetbrains.com/issues/MP
+          - img [ref=e470]
+        - link "JetBrains Marketplace Community" [ref=e472] [cursor=pointer]:
+          - /url: https://platform.jetbrains.com/
+          - img [ref=e473]
+        - link "JetBrains Marketplace on YouTube" [ref=e476] [cursor=pointer]:
+          - /url: https://www.youtube.com/playlist?list=PLQ176FUIyIUZRWGCFY7G9V5zaM00THymY
+          - img [ref=e477]
+        - link "JetBrains Marketplace on LinkedIn" [ref=e479] [cursor=pointer]:
+          - /url: https://www.linkedin.com/showcase/jetbrains-marketplace
+          - img [ref=e480]
+      - generic [ref=e483]:
+        - link "Feedback" [ref=e485] [cursor=pointer]:
+          - /url: mailto:marketplace@jetbrains.com
+        - generic [ref=e486]: Report Content
+        - link "Terms of Use" [ref=e488] [cursor=pointer]:
+          - /url: /legal/terms-of-use
+        - link "Legal, Privacy and Security" [ref=e490] [cursor=pointer]:
+          - /url: /legal
+        - link "jetbrains logo" [ref=e491] [cursor=pointer]:
+          - /url: https://www.jetbrains.com
+          - img "jetbrains logo" [ref=e492]
+      - generic [ref=e494]: Copyright © 2000-2026 JetBrains s.r.o.
+      - generic [ref=e496]:
+        - text: Developed with drive and
+        - link "IntelliJ IDEA" [ref=e497] [cursor=pointer]:
+          - /url: https://jetbrains.com/idea

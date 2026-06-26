@@ -91,12 +91,12 @@ class FuguChatPanel(
         toolTipText = "Model"
     }
     private val modeCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create("") { it.modeLabel }
+        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.modeLabel ?: "" }
         selectedItem = FuguSettings.getInstance().permissionModeEnum
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
     private val mcpCombo = ComboBox(DefaultComboBoxModel(McpMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create("") { it.display }
+        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
         selectedItem = FuguSettings.getInstance().mcpModeEnum
         toolTipText = "Which Claude MCP servers Codex may use (Off / this project / all)"
     }
