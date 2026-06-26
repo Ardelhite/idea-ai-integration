@@ -11,7 +11,6 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import java.awt.BasicStroke
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
@@ -243,10 +242,16 @@ class MessageComponent(
     }
 
     private fun statusComponent(call: ToolCall): JComponent = when {
-        call.isError -> JBLabel(DotIcon(JBColor(0xD64545, 0xF87171)))
-        call.result != null -> JBLabel(DotIcon(JBColor(0x1A9E5E, 0x4ADE80)))
-        else -> Spinner(JBColor(0xD9A40E, 0xF2C94C))
+        call.isError -> asciiStatus("*", removeColor)
+        call.result != null -> asciiStatus("*", addColor)
+        else -> TextSpinner(JBColor(0xD9A40E, 0xF2C94C))
     }
+
+    private fun asciiStatus(text: String, color: Color): JComponent =
+        JBLabel(text).apply {
+            foreground = color
+            font = Font(Font.MONOSPACED, Font.BOLD, JBUI.scaleFontSize(14f))
+        }
 
     private fun actionLabel(name: String) = when (name) {
         "Edit" -> "Edit file"
@@ -313,32 +318,17 @@ class MessageComponent(
         override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
     }
 
-    /** A small filled circle status dot. */
-    private class DotIcon(private val color: Color, private val d: Int = JBUI.scale(9)) : Icon {
-        override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-            val g2 = g.create() as Graphics2D
-            try {
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                g2.color = color
-                g2.fillOval(x, y, d, d)
-            } finally {
-                g2.dispose()
-            }
-        }
-
-        override fun getIconWidth() = d
-        override fun getIconHeight() = d
-    }
-
-    /** A small rotating arc spinner that animates only while showing. */
-    private class Spinner(private val color: Color) : JComponent() {
-        private val sizePx = JBUI.scale(14)
-        private var angle = 0
-        private val timer = Timer(80) { angle = (angle + 30) % 360; repaint() }
+    /** An ASCII spinner cycling \ | / - to convey "running". Animates only while showing. */
+    private class TextSpinner(private val color: Color) : JComponent() {
+        private val frames = charArrayOf('\\', '|', '/', '-')
+        private var i = 0
+        private val timer = Timer(120) { i = (i + 1) % frames.size; repaint() }
 
         init {
-            preferredSize = Dimension(sizePx, sizePx)
+            font = Font(Font.MONOSPACED, Font.BOLD, JBUI.scaleFontSize(14f))
             isOpaque = false
+            val fm = getFontMetrics(font)
+            preferredSize = Dimension(fm.charWidth('W') + JBUI.scale(2), fm.height)
         }
 
         override fun addNotify() {
@@ -354,11 +344,14 @@ class MessageComponent(
         override fun paintComponent(g: Graphics) {
             val g2 = g.create() as Graphics2D
             try {
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+                g2.font = font
                 g2.color = color
-                g2.stroke = BasicStroke(JBUI.scale(2).toFloat(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                val pad = JBUI.scale(2)
-                g2.drawArc(pad, pad, width - 2 * pad, height - 2 * pad, angle, 280)
+                val s = frames[i].toString()
+                val fm = g2.fontMetrics
+                val x = (width - fm.stringWidth(s)) / 2
+                val y = (height - fm.height) / 2 + fm.ascent
+                g2.drawString(s, x.coerceAtLeast(0), y)
             } finally {
                 g2.dispose()
             }

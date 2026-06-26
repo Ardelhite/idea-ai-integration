@@ -29,6 +29,10 @@ import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
 import java.awt.event.KeyEvent
 import javax.swing.BoxLayout
 import javax.swing.DefaultComboBoxModel
@@ -38,6 +42,7 @@ import javax.swing.JPanel
 import javax.swing.KeyStroke
 import javax.swing.ScrollPaneConstants
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 
 /**
  * The Fugu chat tool-window panel: scrolling transcript on top, a composer with
@@ -75,9 +80,11 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
     private val sendButton = JButton("Send")
-    private val statusLabel = JBLabel("Ready").apply {
+    private val statusBar = StatusBar()
+    private val statusLabel = JBLabel("").apply {
         foreground = JBColor.GRAY
-        border = JBUI.Borders.empty(2, 8)
+        horizontalAlignment = javax.swing.SwingConstants.CENTER
+        border = JBUI.Borders.empty(1, 8)
     }
 
     private val components = HashMap<ChatMessage, MessageComponent>()
@@ -204,8 +211,13 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         controls.add(sendButton, BorderLayout.EAST)
         composer.add(controls, BorderLayout.SOUTH)
 
+        val statusArea = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.emptyBottom(2)
+            add(statusBar, BorderLayout.CENTER)
+            add(statusLabel, BorderLayout.SOUTH)
+        }
         val south = JPanel(BorderLayout())
-        south.add(statusLabel, BorderLayout.NORTH)
+        south.add(statusArea, BorderLayout.NORTH)
         south.add(composer, BorderLayout.CENTER)
         return south
     }
@@ -278,6 +290,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     private fun updateBusyState(busy: Boolean) {
         sendButton.text = if (busy) "Stop" else "Send"
+        statusBar.running = busy
     }
 
     private fun scrollToBottom() {
@@ -293,5 +306,65 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     override fun dispose() {
         session.removeListener(this)
+        statusBar.stop()
+    }
+}
+
+/**
+ * A big, centered, ASCII-art status line: `---- READY ----` in blue when idle, and
+ * an animated `>--- RUNNING >---` in green while a turn runs (the `>` marches right
+ * once per second).
+ */
+private class StatusBar : JComponent() {
+    private val readyColor = JBColor(0x2563EB, 0x6AA0FF)
+    private val runColor = JBColor(0x1A9E5E, 0x4ADE80)
+    private var frame = 0
+    private val timer = Timer(1000) { frame = (frame + 1) % 4; repaint() }
+
+    var running: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            frame = 0
+            if (value && isShowing) timer.start() else timer.stop()
+            repaint()
+        }
+
+    init {
+        font = Font(Font.MONOSPACED, Font.BOLD, JBUI.scaleFontSize(15f))
+        preferredSize = Dimension(0, JBUI.scale(26))
+    }
+
+    fun stop() = timer.stop()
+
+    override fun addNotify() {
+        super.addNotify()
+        if (running) timer.start()
+    }
+
+    override fun removeNotify() {
+        timer.stop()
+        super.removeNotify()
+    }
+
+    override fun paintComponent(g: Graphics) {
+        val g2 = g.create() as Graphics2D
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+            g2.font = font
+            g2.color = if (running) runColor else readyColor
+            val text = if (running) runningText() else "---- READY ----"
+            val fm = g2.fontMetrics
+            val x = (width - fm.stringWidth(text)) / 2
+            val y = (height - fm.height) / 2 + fm.ascent
+            g2.drawString(text, x.coerceAtLeast(0), y)
+        } finally {
+            g2.dispose()
+        }
+    }
+
+    private fun runningText(): String {
+        val bar = String(CharArray(4) { if (it == frame) '>' else '-' })
+        return "$bar RUNNING $bar"
     }
 }
