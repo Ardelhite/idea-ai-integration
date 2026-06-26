@@ -74,22 +74,35 @@ small `FuguEvent` set (lenient — unknown fields/versions degrade gracefully):
 | `turn.completed` (`usage`) | `Result` (success) |
 | `turn.failed` / `error` | `Result` (error) |
 
-## Requirements
+## Setup — no terminal required
+
+Open the **Fugu** tool window and click **Set up Fugu** (also on the toolbar, and
+in the warning banner shown until setup is complete). The dialog does everything
+that used to require shell commands:
+
+1. **Sakana API key** — paste a key (from `console.sakana.ai/api-keys`, linked in
+   the dialog) and click **Verify**; it pings `GET /v1/models`. The key is stored
+   in PasswordSafe and injected into every Codex process as `SAKANA_API_KEY` — so
+   no `export` is needed, and it's never written to disk in cleartext.
+2. **Codex CLI** — **Install Codex CLI** runs the Fugu installer (with the key
+   already in the environment) and streams the log into the dialog.
+3. **Sakana provider** — **Write provider config** appends the
+   `[model_providers.sakana]` block to `$CODEX_HOME/config.toml` (default
+   `~/.codex/config.toml`), idempotently and preserving your existing config — so
+   you never hand-edit TOML.
+
+The chat composer stays usable, but the banner reminds you which of the three
+pieces are still missing until `FuguSetup.isReady()`.
+
+### Requirements
 
 - JDK 21 (Gradle toolchain; this machine: `/opt/homebrew/opt/openjdk@21`)
-- Codex CLI + Sakana/Fugu provider — install via the Fugu one-liner below
+- macOS/Linux (the Codex installer supports these; on Windows, install Codex
+  separately and use **Write provider config** + the API key field)
 
-### Installing Fugu (Codex provider)
-
-```bash
-export SAKANA_API_KEY="<key from console.sakana.ai/get-started>"
-curl -fsSL https://sakana.ai/fugu/install | bash   # installs Codex + codex-fugu
-codex-fugu                                          # interactive sanity check
-```
-
-Manual setup writes `~/.codex/config.toml` with a `[model_providers.sakana]`
-block (`base_url = https://api.sakana.ai/v1`, `env_key = SAKANA_API_KEY`,
-`wire_api = responses`). See <https://console.sakana.ai/get-started>.
+> Equivalent manual commands, if you prefer the terminal: `export SAKANA_API_KEY=…`,
+> `curl -fsSL https://sakana.ai/fugu/install | bash`. See
+> <https://console.sakana.ai/get-started>.
 
 ## Build & run
 
@@ -149,17 +162,13 @@ Codex CLI path:   <repo>/tools/mock-codex-appserver
 Sakana provider:  ☐
 ```
 
-## Setup from inside the IDE
+## A note on auth
 
-If the Codex CLI is missing, the tool window shows a banner with **Install Codex
-(Fugu)** — it runs the documented installer (`curl -fsSL https://sakana.ai/fugu/install | bash`)
-after a confirmation, streams the output into the transcript, and points you at
-the console to create an API key. The same action lives in the toolbar.
-
-> Note on auth: Sakana's console supports Google SSO, but there is **no API to
-> auto-fetch a key or account usage** — keys are created manually in the console
-> and pasted/exported as `SAKANA_API_KEY`. The plugin can only surface the
-> per-request token `usage` Codex reports (shown in the status bar after a turn).
+Sakana's console supports Google SSO, but there is **no API to auto-fetch a key
+or account usage** — keys are created manually in the console (the Setup dialog
+deep-links there) and pasted once; the plugin stores them in PasswordSafe. The
+only usage signal available is the per-request token `usage` Codex reports, which
+the plugin tallies and shows in the status bar after each turn.
 
 ## Persistence
 

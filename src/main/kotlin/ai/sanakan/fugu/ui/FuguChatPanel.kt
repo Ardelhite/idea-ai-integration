@@ -1,9 +1,10 @@
 package ai.sanakan.fugu.ui
 
 import ai.sanakan.fugu.core.ChatMessage
-import ai.sanakan.fugu.core.CodexInstaller
 import ai.sanakan.fugu.core.FuguSession
+import ai.sanakan.fugu.core.FuguSetup
 import ai.sanakan.fugu.core.ProjectFiles
+import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
@@ -13,11 +14,9 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
-import com.intellij.openapi.ui.Messages
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -107,9 +106,9 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
                 override fun actionPerformed(e: AnActionEvent) = session.stop()
             })
             addSeparator()
-            add(object : AnAction("Install Codex (Fugu)", "Install the Codex CLI wired to Fugu", AllIcons.Actions.Download) {
+            add(object : AnAction("Set up Fugu", "Install Codex, configure the provider, and set the API key", AllIcons.Actions.Download) {
                 override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun actionPerformed(e: AnActionEvent) = runInstall()
+                override fun actionPerformed(e: AnActionEvent) = openSetup()
             })
             add(object : AnAction("Settings", "Open Fugu settings", AllIcons.General.Settings) {
                 override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -123,56 +122,31 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     private fun buildSetupBanner(): EditorNotificationPanel =
         EditorNotificationPanel(EditorNotificationPanel.Status.Warning).apply {
-            text("Codex CLI not found — install it to start using Fugu.")
-            createActionLabel("Install Codex (Fugu)") { runInstall() }
-            createActionLabel("Get API key") { BrowserUtil.browse(CodexInstaller.CONSOLE_URL) }
+            text("Fugu isn't set up yet — install Codex, configure the provider, and add your API key.")
+            createActionLabel("Set up Fugu") { openSetup() }
+            createActionLabel("Get API key") { BrowserUtil.browse(FuguSecrets.CONSOLE_KEYS_URL) }
             createActionLabel("Settings") { openSettings() }
         }
 
     private fun refreshSetupBanner() {
-        setupBanner.isVisible = !CodexInstaller.isInstalled()
+        setupBanner.isVisible = !FuguSetup.isReady()
+        setupBanner.text(setupBannerText())
         northPanel.revalidate()
         northPanel.repaint()
     }
 
-    private fun runInstall() {
-        val proceed = Messages.showOkCancelDialog(
-            project,
-            "This runs the Fugu installer:\n\n    ${CodexInstaller.INSTALL_COMMAND}\n\n" +
-                "It downloads and executes a setup script from sakana.ai and installs the Codex CLI. " +
-                "Make sure SAKANA_API_KEY is set in your environment first " +
-                "(create a key at ${CodexInstaller.CONSOLE_URL}).\n\nProceed?",
-            "Install Codex (Fugu)",
-            "Run Installer",
-            "Cancel",
-            Messages.getQuestionIcon(),
-        )
-        if (proceed != Messages.OK) return
-
-        val note = session.systemNote("$ ${CodexInstaller.INSTALL_COMMAND}")
-        CodexInstaller.install(project, object : CodexInstaller.Output {
-            override fun line(text: String) = onEdt { session.appendSystemNote(note, text) }
-            override fun done(exitCode: Int) = onEdt {
-                session.appendSystemNote(
-                    note,
-                    if (exitCode == 0) "✓ Installer finished." else "✗ Installer exited with code $exitCode.",
-                )
-                if (exitCode == 0 && CodexInstaller.hasFuguLauncher()) {
-                    FuguSettings.getInstance().cliPath = "codex-fugu"
-                    FuguSettings.getInstance().sakanaProvider = false
-                    session.appendSystemNote(note, "Set Codex CLI path to 'codex-fugu'.")
-                }
-                refreshSetupBanner()
-            }
-
-            override fun failed(message: String) = onEdt {
-                session.appendSystemNote(note, "✗ Failed to launch installer: $message")
-            }
-        })
+    private fun setupBannerText(): String {
+        val missing = buildList {
+            if (!FuguSetup.codexInstalled()) add("Codex CLI")
+            if (!FuguSetup.providerConfigured()) add("Sakana provider")
+            if (!FuguSetup.apiKeyPresent()) add("API key")
+        }
+        return "Fugu setup incomplete — missing: ${missing.joinToString(", ")}."
     }
 
-    private fun onEdt(body: () -> Unit) {
-        ApplicationManager.getApplication().invokeLater({ if (!project.isDisposed) body() })
+    private fun openSetup() {
+        FuguSetupDialog(project).show()
+        refreshSetupBanner()
     }
 
     private fun newConversation() {

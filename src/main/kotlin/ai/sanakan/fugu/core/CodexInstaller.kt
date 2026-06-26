@@ -1,5 +1,6 @@
 package ai.sanakan.fugu.core
 
+import ai.sanakan.fugu.settings.FuguEnv
 import ai.sanakan.fugu.settings.FuguSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
@@ -56,7 +57,8 @@ object CodexInstaller {
     fun install(project: Project, output: Output) {
         val cmd = GeneralCommandLine("/bin/bash", "-lc", INSTALL_COMMAND).apply {
             charset = StandardCharsets.UTF_8
-            withEnvironment(System.getenv())
+            // Inject the stored key so the installer's verification step works without `export`.
+            withEnvironment(FuguEnv.codexEnvironment())
             project.basePath?.let { setWorkDirectory(it) }
         }
 

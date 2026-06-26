@@ -42,6 +42,14 @@ ui/ (Swing, EDT) ──Listener──> core/FuguSession ──FuguTransport─�
   into the **workspace file** (`StoragePathMacros.WORKSPACE_FILE`) so conversations survive restarts.
   The next turn resumes the same Codex thread via the captured `threadId`.
 
+- **Setup is GUI-only — no terminal.** `ui/FuguSetupDialog` (from the banner/toolbar "Set up Fugu")
+  drives the three prerequisites aggregated by `core/FuguSetup.isReady()`: API key
+  (`settings/FuguSecrets` → PasswordSafe, verified via `core/SakanaApi` → `/v1/models`), the Codex
+  binary (`core/CodexInstaller`), and the `[model_providers.sakana]` block written idempotently by
+  `core/CodexConfig` into `$CODEX_HOME/config.toml`. The stored key is injected as `SAKANA_API_KEY`
+  into **both** the agent and installer processes via `FuguEnv.codexEnvironment()`. New setup
+  prerequisites should be surfaced through `FuguSetup` so the banner stays accurate.
+
 ## Conventions that will bite you
 
 - **EDT discipline.** Transport callbacks (`FuguAgentListener`) fire on process reader threads, never
