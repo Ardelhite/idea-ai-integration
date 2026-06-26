@@ -81,6 +81,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
     private val sendButton = JButton("Send")
     private val statusBar = StatusBar()
+    private val promptArea = JPanel(BorderLayout()).apply { isVisible = false }
     private val statusLabel = JBLabel("").apply {
         foreground = JBColor.GRAY
         horizontalAlignment = javax.swing.SwingConstants.CENTER
@@ -216,8 +217,13 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
             add(statusBar, BorderLayout.CENTER)
             add(statusLabel, BorderLayout.SOUTH)
         }
+        // Inline prompt sits between the status and the composer input.
+        val northStack = JPanel(BorderLayout()).apply {
+            add(statusArea, BorderLayout.NORTH)
+            add(promptArea, BorderLayout.CENTER)
+        }
         val south = JPanel(BorderLayout())
-        south.add(statusArea, BorderLayout.NORTH)
+        south.add(northStack, BorderLayout.NORTH)
         south.add(composer, BorderLayout.CENTER)
         return south
     }
@@ -275,6 +281,37 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     override fun onStatus(text: String) {
         statusLabel.text = text
+    }
+
+    override fun onUserPrompt(
+        prompt: ai.sanakan.fugu.cli.UserPrompt,
+        respond: (ai.sanakan.fugu.cli.PromptAction, Map<String, List<String>>) -> Unit,
+    ) {
+        val form = UserPromptPanel(
+            prompt,
+            onSubmit = { answers -> clearPrompt(); respond(ai.sanakan.fugu.cli.PromptAction.ACCEPT, answers) },
+            onCancel = {
+                clearPrompt()
+                val action = if (prompt.kind == ai.sanakan.fugu.cli.UserPromptKind.ELICITATION) {
+                    ai.sanakan.fugu.cli.PromptAction.CANCEL
+                } else {
+                    ai.sanakan.fugu.cli.PromptAction.DECLINE
+                }
+                respond(action, emptyMap())
+            },
+        )
+        promptArea.removeAll()
+        promptArea.add(form, BorderLayout.CENTER)
+        promptArea.isVisible = true
+        promptArea.revalidate()
+        promptArea.repaint()
+    }
+
+    private fun clearPrompt() {
+        promptArea.removeAll()
+        promptArea.isVisible = false
+        promptArea.revalidate()
+        promptArea.repaint()
     }
 
     private fun addMessageComponent(message: ChatMessage) {
