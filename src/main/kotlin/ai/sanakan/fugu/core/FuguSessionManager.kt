@@ -45,6 +45,11 @@ class FuguSessionManager(private val project: Project) : Disposable, PersistentS
         if (sessionList.remove(session)) session.dispose()
     }
 
+    /** Drops every tab's Codex process so the next turn relaunches with new config. */
+    fun reloadAllTransports() {
+        sessionList.forEach { it.reloadTransport() }
+    }
+
     private fun nextNumber(): Int {
         val used = sessionList.mapNotNull { it.title.toIntOrNull() }.toSet()
         var n = 1

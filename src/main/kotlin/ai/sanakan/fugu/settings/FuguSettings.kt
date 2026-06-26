@@ -41,6 +41,23 @@ enum class FuguTransportKind(val display: String) {
     }
 }
 
+/**
+ * Which MCP servers (mirrored from Claude Code's config) Codex should launch.
+ *  - OFF      none
+ *  - PROJECT  this project's servers (`.mcp.json` + `~/.claude.json` project-local)
+ *  - ALL      the above plus user-global servers (`~/.claude.json` top-level)
+ */
+enum class McpMode(val display: String) {
+    OFF("MCP: Off"),
+    PROJECT("MCP: Project"),
+    ALL("MCP: All");
+
+    companion object {
+        fun fromName(value: String?): McpMode =
+            entries.firstOrNull { it.name == value } ?: ALL
+    }
+}
+
 /** Which keystroke submits the message. */
 enum class SendShortcut(val display: String) {
     ENTER("Enter to send (⇧⏎ for newline)"),
@@ -84,6 +101,12 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
 
     /** Inject Claude/Codex project files (CLAUDE.md, .claude/, memory) at thread start. */
     var loadAgentContext: Boolean = true
+
+    /** Which Claude-mirrored MCP servers Codex should launch, stored by enum name. */
+    var mcpMode: String = McpMode.ALL.name
+
+    val mcpModeEnum: McpMode
+        get() = McpMode.fromName(mcpMode)
 
     /** Which keystroke submits the message, stored by enum name. */
     var sendShortcut: String = SendShortcut.ENTER.name

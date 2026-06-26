@@ -59,6 +59,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     /** Project agent files (CLAUDE.md etc.) are injected once per Codex thread. */
     private var agentContextSent = false
 
+    /** Set when an MCP-mode change arrives mid-turn; the transport reloads after. */
+    private var pendingReload = false
+
     /** Item id of the message currently being streamed, to detect message boundaries. */
     private var streamingItemId: String? = null
     private var streamingTextBlock: TextBlock? = null
@@ -72,6 +75,8 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     private val client: FuguTransport
         get() {
             clientRef?.let { return it }
+            // Mirror the user's Claude MCP servers into Codex before it launches.
+            McpConfig.apply(project, FuguSettings.getInstance().mcpModeEnum)
             val dir = project.basePath ?: System.getProperty("user.dir")
             val created = when (FuguSettings.getInstance().transportKind) {
                 FuguTransportKind.EXEC -> FuguCliClient(dir, this)
@@ -123,13 +128,21 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     }
 
     fun stop() {
-        client.stop()
+        clientRef?.stop()
         finishTurn()
+    }
+
+    /** Recreates the transport on the next turn (e.g. after an MCP-mode change). */
+    fun reloadTransport() {
+        if (turnActive) { pendingReload = true; return }
+        clientRef?.stop()
+        clientRef = null
     }
 
     /** Clears the transcript and starts a fresh Codex thread. */
     fun newConversation() {
-        client.reset()
+        clientRef?.reset()
+        pendingThreadId = null
         messages.clear()
         currentAssistant = null
         turnActive = false
@@ -282,6 +295,11 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         currentAssistant = null
         streamingItemId = null
         streamingTextBlock = null
+        if (pendingReload) {
+            pendingReload = false
+            clientRef?.stop()
+            clientRef = null
+        }
         notify { it.onTurnFinished() }
         notify { it.onStatus("Ready") }
     }

@@ -6,9 +6,12 @@ import ai.sanakan.fugu.core.FuguSetup
 import ai.sanakan.fugu.core.ProjectFiles
 import ai.sanakan.fugu.core.SakanaApi
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import ai.sanakan.fugu.core.FuguSessionManager
+import ai.sanakan.fugu.core.McpConfig
 import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
+import ai.sanakan.fugu.settings.McpMode
 import ai.sanakan.fugu.settings.SendShortcut
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.icons.AllIcons
@@ -93,13 +96,24 @@ class FuguChatPanel(
         selectedItem = FuguSettings.getInstance().permissionModeEnum
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
+    private val mcpCombo = ComboBox(DefaultComboBoxModel(McpMode.entries.toTypedArray())).apply {
+        renderer = SimpleListCellRenderer.create("") { it.display }
+        selectedItem = FuguSettings.getInstance().mcpModeEnum
+        toolTipText = "Which Claude MCP servers Codex may use (Off / this project / all)"
+    }
+    private var syncingMcp = false
+
     private val sendButton = SendButton { onSendOrStop() }
     private val sendHint = JBLabel("", javax.swing.SwingConstants.CENTER).apply {
         foreground = JBColor.GRAY
         font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
         alignmentX = Component.CENTER_ALIGNMENT
     }
-    private val onSettingsChanged = Runnable { ApplicationManager.getApplication().invokeLater({ if (!project.isDisposed) refreshSendHint() }, ModalityState.any()) }
+    private val onSettingsChanged = Runnable {
+        ApplicationManager.getApplication().invokeLater({
+            if (!project.isDisposed) { refreshSendHint(); syncMcpCombo() }
+        }, ModalityState.any())
+    }
 
     // Spins an ASCII frame beside the tab number while this tab's turn is running.
     private var tabSpinnerFrame = 0
@@ -148,13 +162,17 @@ class FuguChatPanel(
 
     private fun buildToolbar(): JComponent {
         // Left: CLEAR (this tab's history) + setup/settings.  Right (opposite the gear):
-        // a "+" that opens a new chat tab.
+        // an MCP-scope dropdown, then "+" (new tab) and "×" (close tab).
         val left = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
         left.add(textButton("CLEAR", "Clear this conversation and start a fresh Fugu thread") { newConversation() })
         left.add(iconButton(AllIcons.Actions.Download, "Set up Fugu") { openSetup() })
         left.add(iconButton(AllIcons.General.Settings, "Settings") { openSettings() })
 
+        mcpCombo.maximumSize = Dimension(JBUI.scale(120), mcpCombo.preferredSize.height)
+        mcpCombo.addActionListener { onMcpModeSelected() }
+
         val right = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
+        right.add(mcpCombo)
         right.add(iconButton(AllIcons.General.Add, "New chat tab") { onNewTab() })
         right.add(iconButton(AllIcons.Actions.Close, "End this session and discard its log") { onCloseTab() })
 
@@ -579,6 +597,34 @@ class FuguChatPanel(
 
     private fun openSettings() {
         ShowSettingsUtil.getInstance().showSettingsDialog(project, "ai.sanakan.fugu.settings.FuguConfigurable")
+    }
+
+    /** Applies a new MCP scope: persist, sync other tabs, rewrite Codex config, reload. */
+    private fun onMcpModeSelected() {
+        if (syncingMcp) return
+        val mode = mcpCombo.selectedItem as? McpMode ?: return
+        val settings = FuguSettings.getInstance()
+        if (mode.name == settings.mcpMode) return
+        settings.mcpMode = mode.name
+        FuguSettings.fireChanged()
+        statusLabel.text = "MCP: applying ${mode.display.removePrefix("MCP: ")}…"
+        ApplicationManager.getApplication().executeOnPooledThread {
+            McpConfig.apply(project, mode)
+            val names = McpConfig.collect(project, mode).map { it.name }
+            ApplicationManager.getApplication().invokeLater({
+                if (project.isDisposed) return@invokeLater
+                FuguSessionManager.getInstance(project).reloadAllTransports()
+                statusLabel.text = if (names.isEmpty()) "MCP disabled" else "MCP ready: ${names.joinToString(", ")}"
+            }, ModalityState.any())
+        }
+    }
+
+    private fun syncMcpCombo() {
+        val mode = FuguSettings.getInstance().mcpModeEnum
+        if (mcpCombo.selectedItem == mode) return
+        syncingMcp = true
+        mcpCombo.selectedItem = mode
+        syncingMcp = false
     }
 
     /** Shows the active send keystroke under the Send button (and in the input hint). */
