@@ -55,6 +55,13 @@ kotlin {
 }
 
 intellijPlatform {
+    // Building the settings-search index launches a headless IDE, which crashes on this
+    // 2024.2.x/JDK combo via the bundled Gradle plugin (same GradleJvmSupportMatrix issue
+    // worked around for runIde). The index is optional, so turn the whole feature off —
+    // this is the supported switch; disabling only the task leaves prepareJarSearchableOptions
+    // expecting a missing input dir.
+    buildSearchableOptions = false
+
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
@@ -101,14 +108,6 @@ intellijPlatform {
 tasks {
     wrapper {
         gradleVersion = "8.10.2"
-    }
-
-    // Builds a settings-search index by launching a headless IDE — which crashes on
-    // this 2024.2.x/JDK combo via the bundled Gradle plugin (same GradleJvmSupportMatrix
-    // issue worked around for runIde). The index is optional, so skip it; the plugin and
-    // its settings page work without it.
-    buildSearchableOptions {
-        enabled = false
     }
 
     // Wipes the sandbox IDE's user state — the sample project (incl. its Karato
