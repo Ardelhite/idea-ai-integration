@@ -102,6 +102,13 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
     /** Inject Claude/Codex project files (CLAUDE.md, .claude/, memory) at thread start. */
     var loadAgentContext: Boolean = true
 
+    /**
+     * Allow outbound network in the `workspace-write` sandbox (so `gh`, `curl`, `npm`,
+     * etc. work). Codex blocks network in that sandbox by default; when on, the launch
+     * adds `-c sandbox_workspace_write.network_access=true`.
+     */
+    var allowNetwork: Boolean = true
+
     /** Which Claude-mirrored MCP servers Codex should launch, stored by enum name. */
     var mcpMode: String = McpMode.ALL.name
 

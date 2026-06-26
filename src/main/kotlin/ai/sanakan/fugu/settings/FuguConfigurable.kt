@@ -51,6 +51,8 @@ class FuguConfigurable : Configurable {
         JBCheckBox("Add Sakana provider override (-c model_provider=sakana)")
     private val loadAgentContextCheck =
         JBCheckBox("Load Claude/Codex project files (CLAUDE.md, .claude/, project memory)")
+    private val allowNetworkCheck =
+        JBCheckBox("Allow network in workspace-write sandbox (gh, curl, npm, …)")
     private val apiKeyField = JBPasswordField().apply { columns = 30 }
     private val apiKeyLink = HyperlinkLabel("Create an API key at console.sakana.ai").apply {
         addHyperlinkListener { BrowserUtil.browse(FuguSecrets.CONSOLE_KEYS_URL) }
@@ -71,6 +73,7 @@ class FuguConfigurable : Configurable {
             .addLabeledComponent("Send shortcut:", sendShortcutCombo, true)
             .addComponent(sakanaProviderCheck)
             .addComponent(loadAgentContextCheck)
+            .addComponent(allowNetworkCheck)
             .addLabeledComponent("Sakana API key:", apiKeyField, true)
             .addComponentToRightColumn(apiKeyLink)
             .addLabeledComponent("Extra CLI args:", extraArgsField, true)
@@ -90,6 +93,7 @@ class FuguConfigurable : Configurable {
             (sendShortcutCombo.selectedItem as SendShortcut).name != s.sendShortcut ||
             sakanaProviderCheck.isSelected != s.sakanaProvider ||
             loadAgentContextCheck.isSelected != s.loadAgentContext ||
+            allowNetworkCheck.isSelected != s.allowNetwork ||
             String(apiKeyField.password) != loadedKey ||
             extraArgsField.text != s.extraArgs
     }
@@ -103,6 +107,7 @@ class FuguConfigurable : Configurable {
         s.sendShortcut = (sendShortcutCombo.selectedItem as SendShortcut).name
         s.sakanaProvider = sakanaProviderCheck.isSelected
         s.loadAgentContext = loadAgentContextCheck.isSelected
+        s.allowNetwork = allowNetworkCheck.isSelected
         s.extraArgs = extraArgsField.text.trim()
 
         val key = String(apiKeyField.password)
@@ -122,6 +127,7 @@ class FuguConfigurable : Configurable {
         sendShortcutCombo.selectedItem = s.sendShortcutEnum
         sakanaProviderCheck.isSelected = s.sakanaProvider
         loadAgentContextCheck.isSelected = s.loadAgentContext
+        allowNetworkCheck.isSelected = s.allowNetwork
         extraArgsField.text = s.extraArgs
 
         // PasswordSafe can touch the native keychain — never read it on the EDT.

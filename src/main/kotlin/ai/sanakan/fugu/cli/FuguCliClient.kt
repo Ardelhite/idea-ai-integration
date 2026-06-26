@@ -64,6 +64,10 @@ class FuguCliClient(
                 addParameter("--dangerously-bypass-approvals-and-sandbox")
             } else {
                 addParameters("--sandbox", mode.sandbox)
+                // The workspace-write sandbox blocks network by default; allow it so gh/curl/npm work.
+                if (settings.allowNetwork && mode.sandbox == "workspace-write") {
+                    addParameters("-c", "sandbox_workspace_write.network_access=true")
+                }
                 // exec is headless: `on-request` would be auto-declined, so clamp to never.
                 addParameters("-a", if (mode.approval == "on-request") "never" else mode.approval)
             }

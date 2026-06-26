@@ -111,6 +111,11 @@ class FuguAppServerClient(
         val exe = settings.cliPath.nullize(nullizeSpaces = true) ?: "codex"
         val cmd = GeneralCommandLine(exe).apply {
             addParameter("app-server")
+            // The workspace-write sandbox blocks network by default; allow it (gh/curl/npm)
+            // at server start. Network stays off only in read-only; full-access is open anyway.
+            if (settings.allowNetwork) {
+                addParameters("-c", "sandbox_workspace_write.network_access=true")
+            }
             setWorkDirectory(workingDir)
             charset = StandardCharsets.UTF_8
             withEnvironment(FuguEnv.codexEnvironment())

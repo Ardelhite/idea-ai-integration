@@ -74,7 +74,9 @@ intellijPlatform {
                   model fetch now run off the UI thread); preserve line breaks in your
                   prompts; and modernize APIs flagged on newer IDEs (replace the
                   scheduled-for-removal SimpleListCellRenderer / browse-listener calls and
-                  the deprecated HTML editor kit; stop bundling the IDE's markdown library).</li>
+                  the deprecated HTML editor kit; stop bundling the IDE's markdown library).
+                  Also allow outbound network in the workspace-write sandbox by default so
+                  gh/curl/npm work (toggle in Settings).</li>
               <li><b>0.1.0</b> — Initial release. Multi-tab chat tool window for the
                   Sakana AI Fugu agent (via the Codex CLI): inline tool cards,
                   interactive approvals, GUI-only setup, Claude/Codex project-file
