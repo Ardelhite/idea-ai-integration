@@ -121,9 +121,13 @@ class FuguSetupDialog(private val project: Project) : DialogWrapper(project) {
     }
 
     private fun installCodex() {
-        persistKey()
+        val key = persistKey()
+        if (key.isEmpty()) {
+            setStatus(keyStatus, "Enter your API key first — the installer runs non-interactively and needs it", ok = false)
+            return
+        }
         installButton.isEnabled = false
-        appendLog("$ ${CodexInstaller.INSTALL_COMMAND}")
+        appendLog("$ ${CodexInstaller.INSTALL_SUMMARY}")
         CodexInstaller.install(project, object : CodexInstaller.Output {
             override fun line(text: String) = onEdt { appendLog(text) }
             override fun done(exitCode: Int) = onEdt {

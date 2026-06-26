@@ -12,7 +12,7 @@
 
     <depends>com.intellij.modules.platform</depends>
 
-    <extensions defaultExtensionId="com.intellij">
+    <extensions defaultExtensionNs="com.intellij">
         <!-- Application-level settings -->
         <applicationService serviceImplementation="ai.sanakan.fugu.settings.FuguSettings"/>
         <applicationConfigurable
@@ -30,6 +30,9 @@
                 anchor="right"
                 icon="AllIcons.Toolwindows.ToolWindowMessages"
                 factoryClass="ai.sanakan.fugu.ui.FuguToolWindowFactory"/>
+
+        <!-- Open the Karato tool window by default when a project loads. -->
+        <postStartupActivity implementation="ai.sanakan.fugu.ui.KaratoStartupActivity"/>
     </extensions>
 
     <applicationListeners/>

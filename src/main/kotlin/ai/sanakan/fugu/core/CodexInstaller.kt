@@ -18,14 +18,35 @@ import java.nio.charset.StandardCharsets
  * Detects and installs the Codex CLI used to reach Fugu, the way Claude-Code GUIs
  * offer a one-click "install the agent CLI" affordance.
  *
- * Fugu's documented installer wires the Codex CLI to the Sakana provider:
- *   curl -fsSL https://sakana.ai/fugu/install | bash
- * and requires `SAKANA_API_KEY` to be set in the environment.
+ * Fugu's documented one-liner is `curl -fsSL https://sakana.ai/fugu/install | bash`,
+ * but that bootstrap re-`exec`s the real installer with stdin redirected from
+ * `/dev/tty`, which fails ("Device not configured") when launched from the IDE
+ * with no controlling terminal. So we replicate the bootstrap directly — clone
+ * `SakanaAI/fugu` and run `scripts/install.sh` — in fully non-interactive mode
+ * (`--yes --force`), with `SAKANA_API_KEY` injected so no prompt is needed.
  */
 object CodexInstaller {
 
-    const val INSTALL_COMMAND: String = "curl -fsSL https://sakana.ai/fugu/install | bash"
     const val CONSOLE_URL: String = "https://console.sakana.ai/get-started"
+
+    /** Shown to the user in the install log instead of the raw multi-line script. */
+    const val INSTALL_SUMMARY: String =
+        "git clone https://github.com/SakanaAI/fugu.git ~/.fugu && bash ~/.fugu/scripts/install.sh --yes --force"
+
+    private val repoDir: String
+        get() = System.getenv("FUGU_HOME")?.takeIf { it.isNotBlank() }
+            ?: (System.getProperty("user.home") + "/.fugu")
+
+    /** The actual bash script run by [install] (bootstrap minus the /dev/tty redirect). */
+    private fun installScript(): String {
+        val dir = repoDir
+        return buildString {
+            append("set -e\n")
+            append("export GIT_TERMINAL_PROMPT=0\n")
+            append("if [ ! -d \"$dir/.git\" ]; then git clone --depth 1 https://github.com/SakanaAI/fugu.git \"$dir\"; fi\n")
+            append("exec bash \"$dir/scripts/install.sh\" --yes --force\n")
+        }
+    }
 
     interface Output {
         fun line(text: String)
@@ -55,10 +76,12 @@ object CodexInstaller {
 
     /** Runs the Fugu installer in the background, streaming output to [output]. */
     fun install(project: Project, output: Output) {
-        val cmd = GeneralCommandLine("/bin/bash", "-lc", INSTALL_COMMAND).apply {
+        val cmd = GeneralCommandLine("/bin/bash", "-lc", installScript()).apply {
             charset = StandardCharsets.UTF_8
-            // Inject the stored key so the installer's verification step works without `export`.
+            // Inject the stored key (so the installer needs no prompt) and force
+            // non-interactive mode, since there is no terminal to answer prompts.
             withEnvironment(FuguEnv.codexEnvironment())
+            withEnvironment(mapOf("FUGU_ASSUME_YES" to "1", "FUGU_FORCE" to "1", "GIT_TERMINAL_PROMPT" to "0"))
             project.basePath?.let { setWorkDirectory(it) }
         }
 
