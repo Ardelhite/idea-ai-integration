@@ -369,20 +369,21 @@ class FuguAppServerClient(
     private fun fileSummary(item: JsonObject): String {
         val changes = item["changes"] as? JsonArray ?: return ""
         return changes.mapNotNull { it as? JsonObject }.joinToString("\n") { c ->
-            val kind = c["kind"].str() ?: c["type"].str() ?: "change"
-            "$kind: ${c["path"].str() ?: "?"}"
+            "${changeKind(c) ?: "change"}: ${c["path"].str() ?: "?"}"
         }
     }
 
-    @Volatile private var fileChangeLogged = false
+    /** Codex sends `kind` as `{"type":"add"}` (object) or, in some builds, a bare string. */
+    private fun changeKind(c: JsonObject): String? =
+        (c["kind"] as? JsonObject)?.get("type").str() ?: c["kind"].str()
 
-    /** Lines added / removed for a file change, from numeric stats or a unified diff. */
+    /**
+     * Lines added / removed for a file change. Codex's `diff` is the full file
+     * content for an add/delete (no `+`/`-` prefixes) and a unified diff for an
+     * update, so the count depends on `kind`.
+     */
     private fun fileChangeStats(item: JsonObject): Pair<Int, Int> {
         val changes = item["changes"] as? JsonArray ?: return 0 to 0
-        if (!fileChangeLogged) {
-            fileChangeLogged = true
-            log.info("fileChange item shape: ${item.toString().take(800)}")
-        }
         var add = 0
         var rem = 0
         for (c in changes.mapNotNull { it as? JsonObject }) {
@@ -394,15 +395,26 @@ class FuguAppServerClient(
                 continue
             }
             val diff = listOf("diff", "unifiedDiff", "unified_diff", "patch").firstNotNullOfOrNull { c[it].str() }
-            if (diff != null) {
-                for (line in diff.lineSequence()) {
-                    if (line.startsWith("+") && !line.startsWith("+++")) add++
-                    else if (line.startsWith("-") && !line.startsWith("---")) rem++
+                ?: continue
+            when (changeKind(c)) {
+                "add", "added", "create", "new" -> add += lineCount(diff)
+                "delete", "deleted", "remove", "removed" -> rem += lineCount(diff)
+                else -> {
+                    var la = 0
+                    var lr = 0
+                    for (line in diff.lineSequence()) {
+                        if (line.startsWith("+") && !line.startsWith("+++")) la++
+                        else if (line.startsWith("-") && !line.startsWith("---")) lr++
+                    }
+                    if (la == 0 && lr == 0) add += lineCount(diff) else { add += la; rem += lr }
                 }
             }
         }
         return add to rem
     }
+
+    private fun lineCount(s: String): Int =
+        if (s.isEmpty()) 0 else s.trimEnd('\n').count { it == '\n' } + 1
 
     private fun intOf(o: JsonObject, vararg keys: String): Int? =
         keys.firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() }
