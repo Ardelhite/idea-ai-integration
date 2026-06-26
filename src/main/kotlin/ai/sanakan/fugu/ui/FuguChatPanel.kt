@@ -270,7 +270,6 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
             call.target?.let { ProjectFiles.open(project, it) }
         }
         comp.alignmentX = Component.LEFT_ALIGNMENT
-        comp.maximumSize = Dimension(Int.MAX_VALUE, comp.preferredSize.height)
         components[message] = comp
         transcript.add(comp)
         transcript.revalidate()

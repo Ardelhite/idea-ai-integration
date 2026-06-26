@@ -36,6 +36,10 @@ dependencies {
         exclude(group = "org.jetbrains.kotlin")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
     }
+    // JetBrains' Markdown parser (pure Kotlin) for rendering chat messages.
+    implementation("org.jetbrains:markdown:0.7.3") {
+        exclude(group = "org.jetbrains.kotlin")
+    }
 
     testImplementation("junit:junit:4.13.2")
 }
