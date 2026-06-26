@@ -1,0 +1,13 @@
+Karato — Agent for Sakana AI fugu
+Copyright 2026 Karato contributors
+
+This product includes software developed as an IntelliJ Platform plugin.
+
+It bundles the following third-party libraries, licensed under the
+Apache License, Version 2.0:
+  - kotlinx-serialization-json (JetBrains s.r.o.)
+  - org.jetbrains:markdown    (JetBrains s.r.o.)
+
+"Sakana AI", "Fugu", and "Codex" are names of their respective owners and
+are used only to describe the services this plugin integrates with. This
+project is not affiliated with or endorsed by those owners.

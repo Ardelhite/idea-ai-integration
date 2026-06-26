@@ -27,6 +27,12 @@ dependencies {
             providers.gradleProperty("platformVersion").get(),
         )
         testFramework(TestFrameworkType.Platform)
+
+        // Marketplace publishing toolchain (2.x requires these explicitly):
+        //  - zipSigner: signs the distribution before publishPlugin
+        //  - pluginVerifier: binary-compatibility check across target IDEs
+        zipSigner()
+        pluginVerifier()
     }
 
     // Bundle only serialization; exclude the Kotlin stdlib (provided by the platform).
@@ -53,10 +59,41 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
 
+        changeNotes = """
+            <ul>
+              <li><b>0.1.0</b> — Initial release. Multi-tab chat tool window for the
+                  Sakana AI Fugu agent (via the Codex CLI): inline tool cards,
+                  interactive approvals, GUI-only setup, Claude/Codex project-file
+                  awareness (CLAUDE.md, .claude/, memory) and MCP-server mirroring.</li>
+            </ul>
+        """.trimIndent()
+
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             val until = providers.gradleProperty("pluginUntilBuild").orNull
             if (until.isNullOrBlank()) untilBuild = provider { null } else untilBuild = providers.gradleProperty("pluginUntilBuild")
+        }
+    }
+
+    // Plugin signing — credentials come from the environment, never the repo.
+    // signPlugin runs automatically before publishPlugin when these are present;
+    // it is skipped (with no error) during normal local builds.
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
+    // Marketplace upload (2nd release onward; the first upload must be manual).
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        // channels = listOf("beta") // uncomment to publish to the beta channel
+    }
+
+    // `./gradlew verifyPlugin` checks binary compatibility against target IDEs.
+    pluginVerification {
+        ides {
+            recommended()
         }
     }
 }
@@ -64,6 +101,14 @@ intellijPlatform {
 tasks {
     wrapper {
         gradleVersion = "8.10.2"
+    }
+
+    // Builds a settings-search index by launching a headless IDE — which crashes on
+    // this 2024.2.x/JDK combo via the bundled Gradle plugin (same GradleJvmSupportMatrix
+    // issue worked around for runIde). The index is optional, so skip it; the plugin and
+    // its settings page work without it.
+    buildSearchableOptions {
+        enabled = false
     }
 
     // Wipes the sandbox IDE's user state — the sample project (incl. its Karato

@@ -13,5 +13,13 @@ out/
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
 
+# Plugin signing keys / Marketplace secrets — never commit
+*.pem
+*.crt
+*.p12
+chain.crt
+private.pem
+secrets.properties
+
 # OS
 .DS_Store

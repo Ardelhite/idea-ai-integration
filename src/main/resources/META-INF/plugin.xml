@@ -1,13 +1,37 @@
 <idea-plugin>
     <id>ai.sanakan.fugu.idea</id>
     <name>Karato - Agent for Sakana AI fugu</name>
-    <vendor email="harima42@gmail.com">Karato</vendor>
+    <vendor email="harima42@gmail.com" url="https://github.com/Ardelhite/idea-ai-integration">Karato</vendor>
 
     <description><![CDATA[
-        <p><b>Karato</b> — an IntelliJ agent for <b>Sakana AI Fugu</b> (and <b>fugu-ultra</b>).</p>
-        <p>Drives the Fugu CLI as a subprocess over a streaming-JSON protocol — chat with
-        the agent, watch it edit files in your project, and review changes inline.
-        Inspired by the architecture of open-source Claude Code GUIs.</p>
+        <p><b>Karato</b> is an in-IDE agent for <b>Sakana AI Fugu</b> (and <b>fugu-ultra</b>).
+        It drives the OpenAI <b>Codex CLI</b> — configured with Sakana's Fugu provider — as a
+        subprocess and renders its streamed events as a multi-tab chat tool window: chat with
+        the agent, watch it run commands and edit files in your project, approve actions
+        inline, and review changes as they happen.</p>
+
+        <h3>Features</h3>
+        <ul>
+          <li>Multi-tab chat with inline tool cards (run command / web search / file edits).</li>
+          <li>Interactive approvals and structured prompts shown inline.</li>
+          <li>GUI-only setup — installs Codex, writes the provider config, stores your API key.</li>
+          <li>Reads your existing Claude/Codex project files (<code>CLAUDE.md</code>,
+              <code>.claude/</code>, project memory) so you don't paste them each turn.</li>
+          <li>Mirrors your Claude MCP servers (e.g. Playwright) into Codex so they work here too.</li>
+        </ul>
+
+        <h3>Data &amp; external services</h3>
+        <p>Karato is a client for your own accounts and tools. To function it:
+        sends your prompts and selected project context (the files listed above) to the
+        <b>Sakana AI API</b> via the Codex CLI; runs the <b>Codex CLI</b> and, when MCP is
+        enabled, MCP servers (e.g. via <code>npx</code>) as subprocesses; reads the listed
+        Claude/Codex configuration files; and writes MCP entries to <code>~/.codex/config.toml</code>.
+        Your Sakana API key is stored in the IDE's PasswordSafe and passed to Codex via an
+        environment variable. Karato collects <b>no telemetry</b> and sends nothing to the
+        author. A Sakana account/API key and network access are required.</p>
+
+        <p>Open source (Apache-2.0) —
+        <a href="https://github.com/Ardelhite/idea-ai-integration">github.com/Ardelhite/idea-ai-integration</a>.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
