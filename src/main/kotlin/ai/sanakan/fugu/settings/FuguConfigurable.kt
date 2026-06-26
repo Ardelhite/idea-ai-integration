@@ -1,6 +1,8 @@
 package ai.sanakan.fugu.settings
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
@@ -118,7 +120,17 @@ class FuguConfigurable : Configurable {
         loadAgentContextCheck.isSelected = s.loadAgentContext
         extraArgsField.text = s.extraArgs
 
-        loadedKey = FuguSecrets.getApiKey() ?: ""
-        apiKeyField.text = loadedKey
+        // PasswordSafe can touch the native keychain — never read it on the EDT.
+        loadedKey = ""
+        apiKeyField.text = ""
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val key = FuguSecrets.getApiKey() ?: ""
+            ApplicationManager.getApplication().invokeLater({
+                if (apiKeyField.password.isEmpty()) {
+                    loadedKey = key
+                    apiKeyField.text = key
+                }
+            }, ModalityState.any())
+        }
     }
 }
