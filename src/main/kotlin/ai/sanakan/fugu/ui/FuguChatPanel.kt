@@ -15,9 +15,16 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.PopupStep
+import com.intellij.openapi.ui.popup.util.BaseListPopupStep
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
@@ -65,10 +72,12 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private val input = JBTextArea().apply {
         lineWrap = true
         wrapStyleWord = true
-        rows = 3
-        emptyText.text = "Ask Fugu to build or change something… (⏎ to send, ⇧⏎ for newline)"
+        rows = 6
+        emptyText.text = "Ask Fugu… (⏎ to send, ⇧⏎ newline, @ to reference a file)"
         border = JBUI.Borders.empty(6)
     }
+    private val fileBar = FileReferenceBar { revalidate() }
+    private var inputHeight = JBUI.scale(144)
     private val modelCombo = ComboBox(DefaultComboBoxModel(FuguSettings.KNOWN_MODELS.toTypedArray())).apply {
         isEditable = true
         selectedItem = session.model
@@ -79,7 +88,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         selectedItem = FuguSettings.getInstance().permissionModeEnum
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
-    private val sendButton = JButton("Send")
+    private val sendButton = SendButton { onSendOrStop() }
     private val statusBar = StatusBar()
     private val promptArea = JPanel(BorderLayout()).apply { isVisible = false }
     private val statusLabel = JBLabel("").apply {
@@ -114,11 +123,6 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
             add(object : AnAction("New Conversation", "Clear the transcript and start a new Fugu thread", AllIcons.General.Add) {
                 override fun getActionUpdateThread() = ActionUpdateThread.EDT
                 override fun actionPerformed(e: AnActionEvent) = newConversation()
-            })
-            add(object : AnAction("Stop", "Stop the current turn", AllIcons.Actions.Suspend) {
-                override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun update(e: AnActionEvent) { e.presentation.isEnabled = session.isBusy }
-                override fun actionPerformed(e: AnActionEvent) = session.stop()
             })
             addSeparator()
             add(object : AnAction("Set up Fugu", "Install Codex, configure the provider, and set the API key", AllIcons.Actions.Download) {
@@ -189,8 +193,15 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         val inputScroll = JBScrollPane(input).apply {
             border = JBUI.Borders.customLine(JBColor.border(), 1)
-            preferredSize = Dimension(0, JBUI.scale(72))
+            preferredSize = Dimension(0, inputHeight)
         }
+        // Resize grip (drag to grow/shrink the input) + the file-reference chips.
+        val north = JPanel(BorderLayout()).apply {
+            isOpaque = false
+            add(buildResizeGrip(inputScroll), BorderLayout.NORTH)
+            add(fileBar, BorderLayout.CENTER)
+        }
+        composer.add(north, BorderLayout.NORTH)
         composer.add(inputScroll, BorderLayout.CENTER)
 
         val controls = JPanel(BorderLayout()).apply {
@@ -228,14 +239,72 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         return south
     }
 
-    private fun wireActions() {
-        sendButton.addActionListener { onSendOrStop() }
+    private fun buildResizeGrip(inputScroll: JComponent): JComponent {
+        val grip = object : JComponent() {
+            init {
+                preferredSize = Dimension(0, JBUI.scale(7))
+                cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.N_RESIZE_CURSOR)
+            }
 
+            override fun paintComponent(g: java.awt.Graphics) {
+                g.color = JBColor.border()
+                val w = JBUI.scale(28)
+                g.fillRect((width - w) / 2, height / 2, w, JBUI.scale(2))
+            }
+        }
+        val ml = object : java.awt.event.MouseAdapter() {
+            private var startY = 0
+            private var startH = 0
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                startY = e.yOnScreen
+                startH = inputScroll.height
+            }
+
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                inputHeight = (startH + (startY - e.yOnScreen)).coerceIn(JBUI.scale(56), JBUI.scale(420))
+                inputScroll.preferredSize = Dimension(0, inputHeight)
+                inputScroll.revalidate()
+                this@FuguChatPanel.revalidate()
+            }
+        }
+        grip.addMouseListener(ml)
+        grip.addMouseMotionListener(ml)
+        return grip
+    }
+
+    private fun wireActions() {
         // Enter sends; Shift+Enter inserts a newline.
         val sendKey = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
         input.inputMap.put(sendKey, "fugu-send")
         input.actionMap.put("fugu-send", object : javax.swing.AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent) = onSendOrStop()
+        })
+
+        // "@" opens a project-file picker; the chosen file becomes a reference chip.
+        input.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent) {
+                if (e.length == 1 && runCatching { input.document.getText(e.offset, 1) }.getOrNull() == "@") {
+                    SwingUtilities.invokeLater { showFilePicker(e.offset) }
+                }
+            }
+
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent) {}
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent) {}
+        })
+
+        // Drag & drop files onto the input to attach them.
+        input.dropTarget = java.awt.dnd.DropTarget(input, object : java.awt.dnd.DropTargetAdapter() {
+            override fun drop(e: java.awt.dnd.DropTargetDropEvent) {
+                e.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY)
+                @Suppress("UNCHECKED_CAST")
+                val list = runCatching {
+                    e.transferable.getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor) as List<java.io.File>
+                }.getOrNull().orEmpty()
+                list.forEach { f ->
+                    com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(f)?.let { fileBar.addFile(it) }
+                }
+                e.dropComplete(true)
+            }
         })
 
         modelCombo.addActionListener {
@@ -257,10 +326,67 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
             return
         }
         val text = input.text
-        if (text.isBlank()) return
+        val refs = fileBar.files()
+        if (text.isBlank() && refs.isEmpty()) return
         (modelCombo.editor.item as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { session.model = it }
+        val prompt = buildPrompt(text, refs)
         input.text = ""
-        session.submit(text)
+        fileBar.clear()
+        session.submit(prompt)
+    }
+
+    /** Appends `@<relative-path>` mentions for any attached files to the prompt. */
+    private fun buildPrompt(text: String, refs: List<VirtualFile>): String {
+        if (refs.isEmpty()) return text
+        val base = project.basePath?.trimEnd('/')
+        val mentions = refs.joinToString("\n") { f ->
+            val rel = if (base != null && f.path.startsWith("$base/")) f.path.removePrefix("$base/") else f.path
+            "@$rel"
+        }
+        return if (text.isBlank()) "Referenced files:\n$mentions" else "$text\n\nReferenced files:\n$mentions"
+    }
+
+    private fun showFilePicker(atOffset: Int) {
+        val files = searchProjectFiles()
+        if (files.isEmpty()) return
+        val base = project.basePath?.trimEnd('/')
+        val step = object : BaseListPopupStep<VirtualFile>("Reference a file", files) {
+            override fun isSpeedSearchEnabled() = true
+            override fun getIconFor(value: VirtualFile) = value.fileType.icon
+            override fun getTextFor(value: VirtualFile): String {
+                val parent = value.parent?.path ?: ""
+                val rel = if (base != null && parent.startsWith(base)) parent.removePrefix(base).trimStart('/') else parent
+                return if (rel.isEmpty()) value.name else "${value.name}   $rel/"
+            }
+
+            override fun onChosen(selectedValue: VirtualFile, finalChoice: Boolean): PopupStep<*>? {
+                runCatching {
+                    if (atOffset < input.document.length && input.document.getText(atOffset, 1) == "@") {
+                        input.document.remove(atOffset, 1)
+                    }
+                }
+                fileBar.addFile(selectedValue)
+                return FINAL_CHOICE
+            }
+        }
+        val popup = JBPopupFactory.getInstance().createListPopup(step)
+        val rect = runCatching { input.modelToView2D(atOffset) }.getOrNull()
+        if (rect != null) {
+            popup.show(RelativePoint(input, java.awt.Point(rect.x.toInt(), (rect.y + rect.height).toInt())))
+        } else {
+            popup.showUnderneathOf(input)
+        }
+    }
+
+    private fun searchProjectFiles(): List<VirtualFile> {
+        val result = ArrayList<VirtualFile>()
+        ReadAction.run<RuntimeException> {
+            ProjectFileIndex.getInstance(project).iterateContent { vf ->
+                if (!vf.isDirectory) result.add(vf)
+                result.size < 500
+            }
+        }
+        return result.sortedBy { it.name }
     }
 
     // --- FuguSession.Listener (on EDT) ----------------------------------------
@@ -338,7 +464,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun updateBusyState(busy: Boolean) {
-        sendButton.text = if (busy) "Stop" else "Send"
+        sendButton.running = busy
         statusBar.running = busy
     }
 
