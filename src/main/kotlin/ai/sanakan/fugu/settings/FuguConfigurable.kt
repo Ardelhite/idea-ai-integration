@@ -15,7 +15,7 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 /**
- * Settings UI under Preferences → Tools → Sanakan AI Fugu.
+ * Settings UI under Preferences → Tools → Karato.
  */
 class FuguConfigurable : Configurable {
 
@@ -40,7 +40,7 @@ class FuguConfigurable : Configurable {
     /** Baseline used to detect key edits without re-reading PasswordSafe on every keystroke. */
     private var loadedKey: String = ""
 
-    override fun getDisplayName(): String = "Sanakan AI Fugu"
+    override fun getDisplayName(): String = "Karato"
 
     override fun createComponent(): JComponent {
         val built = FormBuilder.createFormBuilder()

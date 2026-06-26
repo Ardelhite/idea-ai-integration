@@ -128,7 +128,7 @@ class FuguAppServerClient(
             log.warn("Failed to start codex app-server", t)
             listener.onStartFailed(
                 "Could not start 'codex app-server' ('$exe'). Install the Codex CLI and verify the path " +
-                    "in Settings → Tools → Sanakan AI Fugu.\n${t.message ?: t.javaClass.simpleName}",
+                    "in Settings → Tools → Karato.\n${t.message ?: t.javaClass.simpleName}",
             )
             false
         }
@@ -137,8 +137,8 @@ class FuguAppServerClient(
     private fun handshake() {
         val initParams = buildJsonObject {
             put("clientInfo", buildJsonObject {
-                put("name", "Sanakan AI Fugu")
-                put("title", "Sanakan AI Fugu for IntelliJ")
+                put("name", "Karato")
+                put("title", "Karato - Agent for Sakana AI fugu")
                 put("version", "0.1.0")
             })
             put("capabilities", buildJsonObject { put("experimentalApi", false) })

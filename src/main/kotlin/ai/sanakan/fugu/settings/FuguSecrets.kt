@@ -18,7 +18,7 @@ object FuguSecrets {
     const val CONSOLE_KEYS_URL: String = "https://console.sakana.ai/api-keys"
 
     private fun attributes(): CredentialAttributes =
-        CredentialAttributes(generateServiceName("Sanakan AI Fugu", ENV_VAR))
+        CredentialAttributes(generateServiceName("Karato", ENV_VAR))
 
     fun getApiKey(): String? = PasswordSafe.instance.getPassword(attributes())?.takeIf { it.isNotBlank() }
 

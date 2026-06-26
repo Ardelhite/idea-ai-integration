@@ -49,7 +49,7 @@ class FuguSetupDialog(private val project: Project) : DialogWrapper(project) {
     }
 
     init {
-        title = "Set up Sanakan AI Fugu"
+        title = "Set up Karato"
         setOKButtonText("Done")
         apiKeyField.text = FuguSecrets.getApiKey() ?: ""
         wire()

@@ -1,7 +1,7 @@
-# Sanakan AI Fugu — IntelliJ Plugin
+# Karato — Agent for Sakana AI fugu
 
-IntelliJ Platform plugin that integrates **Sakana AI Fugu** (and **fugu-ultra**)
-into the IDE. Fugu has no standalone binary — it is a multi-agent system exposed
+**Karato** is an IntelliJ Platform plugin that integrates **Sakana AI Fugu** (and
+**fugu-ultra**) into the IDE. Fugu has no standalone binary — it is a multi-agent system exposed
 through an OpenAI-compatible API and used for coding via the **Codex CLI** with
 the Sakana provider. This plugin drives Codex as a subprocess, shows the
 conversation in a tool window, renders each command/file-change item as a card,
@@ -41,7 +41,7 @@ events, render a chat surface) — adapted to Codex's `thread/turn/item` protoco
         │ codex app-server | codex exec  (Sakana → Fugu) │
         └─────────────────────────────────────────┘
 
-  settings/  FuguSettings (persisted) + FuguConfigurable (Tools → Sanakan AI Fugu)
+  settings/  FuguSettings (persisted) + FuguConfigurable (Tools → Karato)
 ```
 
 ### Protocol
@@ -76,7 +76,7 @@ small `FuguEvent` set (lenient — unknown fields/versions degrade gracefully):
 
 ## Setup — no terminal required
 
-Open the **Fugu** tool window and click **Set up Fugu** (also on the toolbar, and
+Open the **Karato** tool window and click **Set up Fugu** (also on the toolbar, and
 in the warning banner shown until setup is complete). The dialog does everything
 that used to require shell commands:
 
@@ -113,9 +113,9 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 ./gradlew runIde          # launches a sandbox IDE with the plugin loaded
 ```
 
-Open the **Fugu** tool window on the right and start chatting.
+Open the **Karato** tool window on the right and start chatting.
 
-### Configuration — Settings → Tools → Sanakan AI Fugu
+### Configuration — Settings → Tools → Karato
 
 | Setting | Default | Notes |
 |---|---|---|

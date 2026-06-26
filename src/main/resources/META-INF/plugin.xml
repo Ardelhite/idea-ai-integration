@@ -1,10 +1,10 @@
 <idea-plugin>
     <id>ai.sanakan.fugu.idea</id>
-    <name>Sanakan AI Fugu</name>
-    <vendor email="harima42@gmail.com">Sanakan</vendor>
+    <name>Karato - Agent for Sakana AI fugu</name>
+    <vendor email="harima42@gmail.com">Karato</vendor>
 
     <description><![CDATA[
-        <p>IntelliJ integration for <b>Sanakan AI Fugu</b> (and <b>fugu-ultra</b>).</p>
+        <p><b>Karato</b> — an IntelliJ agent for <b>Sakana AI Fugu</b> (and <b>fugu-ultra</b>).</p>
         <p>Drives the Fugu CLI as a subprocess over a streaming-JSON protocol — chat with
         the agent, watch it edit files in your project, and review changes inline.
         Inspired by the architecture of open-source Claude Code GUIs.</p>
@@ -19,14 +19,14 @@
                 parentId="tools"
                 instance="ai.sanakan.fugu.settings.FuguConfigurable"
                 id="ai.sanakan.fugu.settings.FuguConfigurable"
-                displayName="Sanakan AI Fugu"/>
+                displayName="Karato"/>
 
         <!-- Per-project session service -->
         <projectService serviceImplementation="ai.sanakan.fugu.core.FuguSession"/>
 
         <!-- Chat tool window -->
         <toolWindow
-                id="Fugu"
+                id="Karato"
                 anchor="right"
                 icon="AllIcons.Toolwindows.ToolWindowMessages"
                 factoryClass="ai.sanakan.fugu.ui.FuguToolWindowFactory"/>

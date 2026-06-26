@@ -91,7 +91,7 @@ class FuguCliClient(
             log.warn("Failed to start Codex CLI", t)
             listener.onStartFailed(
                 "Could not start the Codex CLI ('$exe'). Install it via the Fugu one-line installer " +
-                    "and check the path in Settings → Tools → Sanakan AI Fugu.\n${t.message ?: t.javaClass.simpleName}",
+                    "and check the path in Settings → Tools → Karato.\n${t.message ?: t.javaClass.simpleName}",
             )
         }
     }

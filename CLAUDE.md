@@ -71,6 +71,6 @@ ui/ (Swing, EDT) ──Listener──> core/FuguSession ──FuguTransport─�
 ## Testing changes without the real CLI
 
 `tools/mock-codex-appserver` (app-server JSON-RPC + approval flow) and `tools/mock-fugu` (`exec --json`)
-let you exercise both transports offline. Point **Settings → Tools → Sanakan AI Fugu → Codex CLI path**
+let you exercise both transports offline. Point **Settings → Tools → Karato → Codex CLI path**
 at the matching mock and turn the Sakana provider override **off**. See README "Trying it without the
 real CLI".
