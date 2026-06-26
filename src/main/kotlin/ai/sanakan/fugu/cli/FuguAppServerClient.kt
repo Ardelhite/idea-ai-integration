@@ -288,7 +288,9 @@ class FuguAppServerClient(
             "turn/started" -> Unit
             "item/started" -> params?.get("item")?.jsonObject?.let { emitItem(it, completed = false) }
             "item/completed" -> params?.get("item")?.jsonObject?.let { emitItem(it, completed = true) }
-            "item/agentMessage/delta" -> params?.get("delta").str()?.let { listener.onEvent(FuguEvent.AgentMessage(it)) }
+            // Streaming deltas are intentionally ignored: the full text also arrives on
+            // item/completed, and emitting both duplicated every message in the transcript.
+            "item/agentMessage/delta" -> Unit
             "error" -> {
                 val willRetry = params?.get("willRetry").str() == "true"
                 val msg = params?.get("error")?.jsonObject?.get("message").str() ?: "agent error"
