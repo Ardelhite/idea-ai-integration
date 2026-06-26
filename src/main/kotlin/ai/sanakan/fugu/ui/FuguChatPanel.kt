@@ -300,11 +300,23 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
                 respond(action, emptyMap())
             },
         )
+        showInPrompt(form)
+    }
+
+    override fun onApprovalPrompt(
+        request: ai.sanakan.fugu.cli.ApprovalRequest,
+        respond: (ai.sanakan.fugu.cli.ApprovalDecision) -> Unit,
+    ) {
+        showInPrompt(ApprovalPanel(request) { decision -> clearPrompt(); respond(decision) })
+    }
+
+    private fun showInPrompt(form: JComponent) {
         promptArea.removeAll()
         promptArea.add(form, BorderLayout.CENTER)
         promptArea.isVisible = true
         promptArea.revalidate()
         promptArea.repaint()
+        scrollToBottom()
     }
 
     private fun clearPrompt() {

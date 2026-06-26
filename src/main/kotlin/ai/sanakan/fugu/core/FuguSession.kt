@@ -19,7 +19,6 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFileManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
@@ -49,6 +48,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
         /** The agent wants a structured answer; render it inline and call [respond] once. */
         fun onUserPrompt(prompt: UserPrompt, respond: (PromptAction, Map<String, List<String>>) -> Unit) {}
+
+        /** The agent wants approval before acting; render it inline and call [respond] once. */
+        fun onApprovalPrompt(request: ApprovalRequest, respond: (ApprovalDecision) -> Unit) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -203,25 +205,18 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
     }
 
     override fun onApproval(request: ApprovalRequest, respond: (ApprovalDecision) -> Unit) = onEdt {
-        val choice = Messages.showYesNoCancelDialog(
-            project,
-            buildString {
-                append(request.summary)
-                request.detail?.takeIf { it.isNotBlank() }?.let { append("\n\nReason: ").append(it) }
-            },
-            "Fugu — Approve action?",
-            "Approve",
-            "Approve for session",
-            "Decline",
-            Messages.getQuestionIcon(),
-        )
-        val decision = when (choice) {
-            Messages.YES -> ApprovalDecision.ACCEPT
-            Messages.NO -> ApprovalDecision.ACCEPT_FOR_SESSION
-            else -> ApprovalDecision.DECLINE
+        if (listeners.isEmpty()) {
+            respond(ApprovalDecision.DECLINE)
+            return@onEdt
         }
-        notify { it.onStatus("Approval: ${decision.wire}") }
-        respond(decision)
+        val once = AtomicBoolean(false)
+        val guarded: (ApprovalDecision) -> Unit = { decision ->
+            if (once.compareAndSet(false, true)) {
+                notify { it.onStatus("Approval: ${decision.wire}") }
+                respond(decision)
+            }
+        }
+        notify { it.onApprovalPrompt(request, guarded) }
     }
 
     override fun onUserInput(prompt: UserPrompt, respond: (PromptAction, Map<String, List<String>>) -> Unit) = onEdt {
