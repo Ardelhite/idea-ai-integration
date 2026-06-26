@@ -38,6 +38,9 @@ class FuguConfigurable : Configurable {
     private val permissionCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
         renderer = SimpleListCellRenderer.create("") { it.display }
     }
+    private val sendShortcutCombo = ComboBox(DefaultComboBoxModel(SendShortcut.entries.toTypedArray())).apply {
+        renderer = SimpleListCellRenderer.create("") { it.display }
+    }
     private val sakanaProviderCheck =
         JBCheckBox("Add Sakana provider override (-c model_provider=sakana)")
     private val apiKeyField = JBPasswordField().apply { columns = 30 }
@@ -57,6 +60,7 @@ class FuguConfigurable : Configurable {
             .addLabeledComponent("Codex CLI path:", cliPathField, true)
             .addLabeledComponent("Model:", modelCombo, true)
             .addLabeledComponent("Permission mode:", permissionCombo, true)
+            .addLabeledComponent("Send shortcut:", sendShortcutCombo, true)
             .addComponent(sakanaProviderCheck)
             .addLabeledComponent("Sakana API key:", apiKeyField, true)
             .addComponentToRightColumn(apiKeyLink)
@@ -74,6 +78,7 @@ class FuguConfigurable : Configurable {
             cliPathField.text != s.cliPath ||
             (modelCombo.editor.item as? String ?: "") != s.model ||
             (permissionCombo.selectedItem as FuguPermissionMode).name != s.permissionMode ||
+            (sendShortcutCombo.selectedItem as SendShortcut).name != s.sendShortcut ||
             sakanaProviderCheck.isSelected != s.sakanaProvider ||
             String(apiKeyField.password) != loadedKey ||
             extraArgsField.text != s.extraArgs
@@ -85,6 +90,7 @@ class FuguConfigurable : Configurable {
         s.cliPath = cliPathField.text.trim().ifEmpty { "codex" }
         s.model = (modelCombo.editor.item as? String ?: "fugu").trim().ifEmpty { "fugu" }
         s.permissionMode = (permissionCombo.selectedItem as FuguPermissionMode).name
+        s.sendShortcut = (sendShortcutCombo.selectedItem as SendShortcut).name
         s.sakanaProvider = sakanaProviderCheck.isSelected
         s.extraArgs = extraArgsField.text.trim()
 
@@ -93,6 +99,7 @@ class FuguConfigurable : Configurable {
             FuguSecrets.setApiKey(key)
             loadedKey = key
         }
+        FuguSettings.fireChanged()
     }
 
     override fun reset() {
@@ -101,6 +108,7 @@ class FuguConfigurable : Configurable {
         cliPathField.text = s.cliPath
         modelCombo.editor.item = s.model
         permissionCombo.selectedItem = s.permissionModeEnum
+        sendShortcutCombo.selectedItem = s.sendShortcutEnum
         sakanaProviderCheck.isSelected = s.sakanaProvider
         extraArgsField.text = s.extraArgs
 

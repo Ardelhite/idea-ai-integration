@@ -41,6 +41,17 @@ enum class FuguTransportKind(val display: String) {
     }
 }
 
+/** Which keystroke submits the message. */
+enum class SendShortcut(val display: String) {
+    ENTER("Enter to send (⇧⏎ for newline)"),
+    MODIFIER_ENTER("⌘/Alt + Enter to send (⏎ for newline)");
+
+    companion object {
+        fun fromName(value: String?): SendShortcut =
+            entries.firstOrNull { it.name == value } ?: ENTER
+    }
+}
+
 /**
  * Application-wide, persisted configuration for the Fugu integration.
  *
@@ -71,6 +82,12 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
     /** Extra args appended verbatim to every `codex exec` invocation. */
     var extraArgs: String = ""
 
+    /** Which keystroke submits the message, stored by enum name. */
+    var sendShortcut: String = SendShortcut.ENTER.name
+
+    val sendShortcutEnum: SendShortcut
+        get() = SendShortcut.fromName(sendShortcut)
+
     override fun getState(): FuguSettings = this
 
     override fun loadState(state: FuguSettings) {
@@ -90,5 +107,15 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
 
         /** Known model aliases shown in the UI dropdown. */
         val KNOWN_MODELS = listOf("fugu", "fugu-ultra")
+
+        private val changeListeners = java.util.concurrent.CopyOnWriteArrayList<Runnable>()
+
+        /** Subscribe to settings-applied notifications (e.g. to refresh open UI). */
+        fun addChangeListener(listener: Runnable) { changeListeners.add(listener) }
+
+        fun removeChangeListener(listener: Runnable) { changeListeners.remove(listener) }
+
+        /** Invoked by the settings page after `apply()` so open panels can react. */
+        fun fireChanged() { changeListeners.forEach { it.run() } }
     }
 }

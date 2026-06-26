@@ -9,6 +9,8 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
+import ai.sanakan.fugu.settings.SendShortcut
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
@@ -94,6 +96,12 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
     private val sendButton = SendButton { onSendOrStop() }
+    private val sendHint = JBLabel("", javax.swing.SwingConstants.CENTER).apply {
+        foreground = JBColor.GRAY
+        font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
+        alignmentX = Component.CENTER_ALIGNMENT
+    }
+    private val onSettingsChanged = Runnable { ApplicationManager.getApplication().invokeLater({ if (!project.isDisposed) refreshSendHint() }, ModalityState.any()) }
     private val statusBar = StatusBar()
     private val promptArea = JPanel(BorderLayout()).apply { isVisible = false }
     private val statusLabel = JBLabel("").apply {
@@ -116,6 +124,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         wireActions()
         session.addListener(this)
+        FuguSettings.addChangeListener(onSettingsChanged)
 
         // Rebuild any pre-existing transcript (tool window reopened).
         session.messages.forEach { addMessageComponent(it) }
@@ -242,9 +251,18 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         }
         modelCombo.maximumSize = Dimension(JBUI.scale(150), modelCombo.preferredSize.height)
         modeCombo.maximumSize = Dimension(JBUI.scale(110), modeCombo.preferredSize.height)
+        val sendBox = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+            sendButton.alignmentX = Component.CENTER_ALIGNMENT
+            add(sendButton)
+            add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)))
+            add(sendHint)
+        }
         controls.add(left, BorderLayout.WEST)
-        controls.add(sendButton, BorderLayout.EAST)
+        controls.add(sendBox, BorderLayout.EAST)
         composer.add(controls, BorderLayout.SOUTH)
+        refreshSendHint()
 
         val statusArea = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.emptyBottom(2)
@@ -295,11 +313,24 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         return grip
     }
 
+    /** The platform modifier paired with Enter for the "⌘/Alt + Enter" send mode. */
+    private val sendModifierMask = if (SystemInfo.isMac) KeyEvent.META_DOWN_MASK else KeyEvent.ALT_DOWN_MASK
+
     private fun wireActions() {
-        // Enter sends; Shift+Enter inserts a newline.
-        val sendKey = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
-        input.inputMap.put(sendKey, "fugu-send")
-        input.actionMap.put("fugu-send", object : javax.swing.AbstractAction() {
+        // Both keystrokes are always bound; the active send shortcut is read live, so
+        // changing it in Settings takes effect immediately without reopening the panel.
+        //  - plain Enter:      sends in ENTER mode, inserts a newline in MODIFIER mode
+        //  - ⌘/Alt + Enter:    always sends (and inserts a newline in ENTER mode would
+        //                      be confusing, so it stays a send shortcut there too)
+        input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "fugu-enter")
+        input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, sendModifierMask), "fugu-modifier-enter")
+        input.actionMap.put("fugu-enter", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent) {
+                if (FuguSettings.getInstance().sendShortcutEnum == SendShortcut.ENTER) onSendOrStop()
+                else input.replaceSelection("\n")
+            }
+        })
+        input.actionMap.put("fugu-modifier-enter", object : javax.swing.AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent) = onSendOrStop()
         })
 
@@ -506,8 +537,21 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         ShowSettingsUtil.getInstance().showSettingsDialog(project, "ai.sanakan.fugu.settings.FuguConfigurable")
     }
 
+    /** Shows the active send keystroke under the Send button (and in the input hint). */
+    private fun refreshSendHint() {
+        val hint = when (FuguSettings.getInstance().sendShortcutEnum) {
+            SendShortcut.ENTER -> "Enter"
+            SendShortcut.MODIFIER_ENTER -> if (SystemInfo.isMac) "⌘ + Enter" else "Alt + Enter"
+        }
+        sendHint.text = hint
+        input.emptyText.text = "Ask Fugu… ($hint to send, @ to reference a file)"
+        sendHint.revalidate()
+        sendHint.repaint()
+    }
+
     override fun dispose() {
         session.removeListener(this)
+        FuguSettings.removeChangeListener(onSettingsChanged)
         statusBar.stop()
     }
 }
