@@ -61,6 +61,11 @@ def main():
             cur_thread = params.get("threadId", cur_thread)
             send({"id": mid, "result": {"turn": {"id": cur_turn, "items": [], "status": "inProgress"}}})
             send({"method": "turn/started", "params": {"threadId": cur_thread, "turn": {"id": cur_turn}}})
+            # Stream the first message token-by-token, then complete it (no duplicate).
+            for chunk in ["I'd like ", "to update ", "README.md."]:
+                send({"method": "item/agentMessage/delta", "params": {
+                    "threadId": cur_thread, "turnId": cur_turn, "itemId": "i1", "delta": chunk,
+                }})
             send({"method": "item/completed", "params": {
                 "threadId": cur_thread, "turnId": cur_turn,
                 "item": {"type": "agentMessage", "id": "i1", "text": "I'd like to update README.md."},

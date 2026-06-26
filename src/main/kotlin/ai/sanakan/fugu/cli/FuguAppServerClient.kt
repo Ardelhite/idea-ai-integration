@@ -65,6 +65,9 @@ class FuguAppServerClient(
     private var queuedPrompt: String? = null
     private var model: String = "fugu"
 
+    /** Agent-message item ids that streamed via deltas, so item/completed won't repeat them. */
+    private val streamedItems = ConcurrentHashMap.newKeySet<String>()
+
     override val isRunning: Boolean
         get() = handler?.let { !it.isProcessTerminated } ?: false
 
@@ -93,6 +96,7 @@ class FuguAppServerClient(
     override fun stop() {
         pending.clear()
         queuedPrompt = null
+        streamedItems.clear()
         stage = Stage.IDLE
         runCatching { stdin?.close() }
         handler?.destroyProcess()
@@ -284,13 +288,23 @@ class FuguAppServerClient(
 
     private fun handleNotification(method: String, params: JsonObject?) {
         when (method) {
-            "turn/completed" -> listener.onEvent(FuguEvent.Result(false, null, turnTokens(params)))
-            "turn/started" -> Unit
+            "turn/completed" -> {
+                streamedItems.clear()
+                listener.onEvent(FuguEvent.Result(false, null, turnTokens(params)))
+            }
+            "turn/started" -> streamedItems.clear()
             "item/started" -> params?.get("item")?.jsonObject?.let { emitItem(it, completed = false) }
             "item/completed" -> params?.get("item")?.jsonObject?.let { emitItem(it, completed = true) }
-            // Streaming deltas are intentionally ignored: the full text also arrives on
-            // item/completed, and emitting both duplicated every message in the transcript.
-            "item/agentMessage/delta" -> Unit
+            // Stream the text token-by-token; item/completed then skips this id (see emitItem)
+            // so the message isn't appended twice.
+            "item/agentMessage/delta" -> {
+                val itemId = params?.get("itemId").str()
+                val delta = params?.get("delta").str()
+                if (itemId != null && delta != null) {
+                    streamedItems.add(itemId)
+                    listener.onEvent(FuguEvent.AgentMessageDelta(itemId, delta))
+                }
+            }
             "error" -> {
                 val willRetry = params?.get("willRetry").str() == "true"
                 val msg = params?.get("error")?.jsonObject?.get("message").str() ?: "agent error"
@@ -304,7 +318,8 @@ class FuguAppServerClient(
         val type = item["type"].str() ?: return
         val id = item["id"].str() ?: type
         when (type) {
-            "agentMessage" -> if (completed) listener.onEvent(FuguEvent.AgentMessage(item["text"].str() ?: ""))
+            // If this message already streamed via deltas, don't re-append it on completion.
+            "agentMessage" -> if (completed && id !in streamedItems) listener.onEvent(FuguEvent.AgentMessage(item["text"].str() ?: ""))
             "commandExecution" -> toolEvent(
                 completed, id, "Shell",
                 buildJsonObject { item["command"].str()?.let { put("command", it) } },

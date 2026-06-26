@@ -37,6 +37,9 @@ sealed interface FuguEvent {
     /** A completed assistant message. */
     data class AgentMessage(val text: String) : FuguEvent
 
+    /** An incremental chunk of a streaming assistant message ([itemId] groups a message). */
+    data class AgentMessageDelta(val itemId: String, val text: String) : FuguEvent
+
     /** A tool/command item began running. */
     data class ToolStarted(val id: String, val name: String, val input: JsonObject) : FuguEvent
 

@@ -54,6 +54,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
     private var currentAssistant: ChatMessage? = null
     private var turnActive = false
 
+    /** Item id of the message currently being streamed, to detect message boundaries. */
+    private var streamingItemId: String? = null
+
     /** Cumulative output tokens this session (Sakana exposes no account-level usage API). */
     private var sessionOutputTokens = 0L
 
@@ -101,6 +104,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         messages.clear()
         currentAssistant = null
         turnActive = false
+        streamingItemId = null
         sessionOutputTokens = 0L
         notify { it.onStatus("New conversation") }
     }
@@ -115,6 +119,17 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
             is FuguEvent.AgentMessage -> {
                 val msg = ensureAssistant()
                 if (msg.text.isNotEmpty()) msg.appendText("\n\n")
+                msg.appendText(event.text)
+                notify { it.onMessageUpdated(msg) }
+            }
+
+            is FuguEvent.AgentMessageDelta -> {
+                val msg = ensureAssistant()
+                // A new message id within the turn → separate it from prior content.
+                if (streamingItemId != event.itemId) {
+                    if (msg.text.isNotEmpty()) msg.appendText("\n\n")
+                    streamingItemId = event.itemId
+                }
                 msg.appendText(event.text)
                 notify { it.onMessageUpdated(msg) }
             }
@@ -219,6 +234,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         turnActive = false
         currentAssistant?.streaming = false
         currentAssistant = null
+        streamingItemId = null
         notify { it.onTurnFinished() }
         notify { it.onStatus("Ready") }
     }
