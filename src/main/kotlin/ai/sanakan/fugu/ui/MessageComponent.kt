@@ -3,32 +3,42 @@ package ai.sanakan.fugu.ui
 import ai.sanakan.fugu.core.ChatMessage
 import ai.sanakan.fugu.core.ChatRole
 import ai.sanakan.fugu.core.ToolCall
+import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.ui.ColorUtil
+import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import java.awt.BasicStroke
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Component
-import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
+import javax.swing.Box
 import javax.swing.BoxLayout
+import javax.swing.Icon
+import javax.swing.JComponent
 import javax.swing.JEditorPane
 import javax.swing.JPanel
-import javax.swing.JTextArea
 import javax.swing.SwingConstants
+import javax.swing.Timer
 import javax.swing.event.HyperlinkEvent
 
 /**
  * Renders a single [ChatMessage] as a bordered bubble with a role header, a
- * Markdown-rendered body, and a card per tool call.
+ * Markdown-rendered body, and a rounded card per tool call. Each tool card shows
+ * the action, its target (file paths are links that open in the editor), and a
+ * status indicator: a spinner while running, a green dot on success, red on error.
  *
- * Height tracks content: [getMaximumSize] returns the live preferred height so a
- * vertical [BoxLayout] never clips a growing (streaming) message or its tool
- * cards. The body is an [JEditorPane] that re-wraps to its allotted width.
+ * Height tracks content via [getMaximumSize] so a vertical BoxLayout never clips
+ * a growing (streaming) message or its tool cards.
  */
 class MessageComponent(
     private val message: ChatMessage,
@@ -36,7 +46,6 @@ class MessageComponent(
 ) : JPanel(BorderLayout()) {
 
     private val body = object : JEditorPane() {
-        // Compute the wrapped height for whatever width the layout gives us.
         override fun getPreferredSize(): Dimension {
             if (width > 0) setSize(width, Int.MAX_VALUE)
             return super.getPreferredSize()
@@ -59,7 +68,11 @@ class MessageComponent(
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         isOpaque = false
         alignmentX = Component.LEFT_ALIGNMENT
+        border = JBUI.Borders.emptyTop(4)
     }
+
+    /** So tool cards (and their spinners) only rebuild when a tool's state changes. */
+    private var lastToolSignature = ""
 
     init {
         isOpaque = true
@@ -98,11 +111,16 @@ class MessageComponent(
         body.text = htmlDocument(markdown)
         body.isVisible = txt.isNotEmpty() || message.streaming
 
-        toolsPanel.removeAll()
-        for (call in message.toolCalls) {
-            toolsPanel.add(toolCard(call))
+        val signature = message.toolCalls.joinToString("|") { "${it.id}:${it.result != null}:${it.isError}" }
+        if (signature != lastToolSignature) {
+            lastToolSignature = signature
+            toolsPanel.removeAll()
+            message.toolCalls.forEachIndexed { i, call ->
+                if (i > 0) toolsPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
+                toolsPanel.add(toolCard(call))
+            }
+            toolsPanel.isVisible = message.toolCalls.isNotEmpty()
         }
-        toolsPanel.isVisible = message.toolCalls.isNotEmpty()
         revalidate()
         repaint()
     }
@@ -125,51 +143,63 @@ class MessageComponent(
         """.trimIndent()
     }
 
+    // --- tool cards ------------------------------------------------------------
+
     private fun toolCard(call: ToolCall): Component {
-        val card = JPanel(BorderLayout()).apply {
-            background = UIUtil.getPanelBackground()
-            border = JBUI.Borders.compound(
-                JBUI.Borders.customLine(JBColor.border(), 1),
-                JBUI.Borders.empty(4, 8),
-            )
+        val isFile = call.name == "Edit"
+        val card = RoundedPanel().apply {
+            layout = BorderLayout(JBUI.scale(8), 0)
+            border = JBUI.Borders.empty(5, 9)
             alignmentX = Component.LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
-        }
-        val titleRow = JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply { isOpaque = false }
-        val statusIcon = when {
-            call.isError -> "✗"
-            call.result != null -> "✓"
-            else -> "▸"
-        }
-        titleRow.add(JBLabel("$statusIcon  ${call.name}").apply {
-            font = font.deriveFont(Font.BOLD)
-            foreground = if (call.isError) JBColor.RED else UIUtil.getLabelForeground()
-        })
-        call.target?.let { titleRow.add(JBLabel(it).apply { foreground = JBColor.GRAY }) }
-        card.add(titleRow, BorderLayout.NORTH)
-
-        if (call.name == "Edit" && call.target != null) {
-            card.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-            card.toolTipText = "Open ${call.target}"
-            card.addMouseListener(object : java.awt.event.MouseAdapter() {
-                override fun mouseClicked(e: java.awt.event.MouseEvent) = onToolClicked(call)
-            })
         }
 
-        call.result?.takeIf { it.isNotBlank() }?.let { result ->
-            val preview = result.lineSequence().take(8).joinToString("\n")
-            card.add(JTextArea(preview).apply {
-                isEditable = false
-                isOpaque = false
-                lineWrap = true
-                wrapStyleWord = true
-                font = UIUtil.getFont(UIUtil.FontSize.SMALL, null)
-                foreground = JBColor.GRAY
-                border = JBUI.Borders.emptyTop(2)
-            }, BorderLayout.CENTER)
+        val left = JPanel(FlowLayout(FlowLayout.LEFT, 5, 0)).apply { isOpaque = false }
+        left.add(JBLabel(actionIcon(call.name)))
+        left.add(JBLabel(actionLabel(call.name)).apply { font = font.deriveFont(Font.BOLD) })
+        card.add(left, BorderLayout.WEST)
+
+        call.target?.let { target ->
+            val center: JComponent = if (isFile) {
+                HyperlinkLabel(target).apply {
+                    toolTipText = "Open $target"
+                    addHyperlinkListener { onToolClicked(call) }
+                }
+            } else {
+                JBLabel(shorten(target)).apply { foreground = JBColor.GRAY; toolTipText = target }
+            }
+            card.add(center, BorderLayout.CENTER)
+        }
+
+        card.add(statusComponent(call), BorderLayout.EAST)
+        call.result?.takeIf { it.isNotBlank() }?.let {
+            card.toolTipText = it.lineSequence().take(12).joinToString("\n")
         }
         return card
     }
+
+    private fun statusComponent(call: ToolCall): JComponent = when {
+        call.isError -> JBLabel(DotIcon(JBColor(0xD64545, 0xF87171)))
+        call.result != null -> JBLabel(DotIcon(JBColor(0x1A9E5E, 0x4ADE80)))
+        else -> Spinner(JBColor(0xD9A40E, 0xF2C94C))
+    }
+
+    private fun actionLabel(name: String) = when (name) {
+        "Edit" -> "Edit file"
+        "Shell" -> "Run command"
+        "WebSearch" -> "Web search"
+        "Plan" -> "Plan"
+        else -> name
+    }
+
+    private fun actionIcon(name: String): Icon = when (name) {
+        "Edit" -> AllIcons.Actions.Edit
+        "Shell" -> AllIcons.Debugger.Console
+        "WebSearch" -> AllIcons.Actions.Search
+        else -> AllIcons.Nodes.Plugin
+    }
+
+    private fun shorten(s: String, max: Int = 80): String =
+        s.replace("\n", " ").let { if (it.length > max) it.take(max - 1) + "…" else it }
 
     private fun roleLabel(role: ChatRole) = when (role) {
         ChatRole.USER -> "You"
@@ -189,5 +219,86 @@ class MessageComponent(
         ChatRole.USER -> UIUtil.getPanelBackground()
         ChatRole.ERROR -> JBColor(0xFDECEC, 0x4A2C2C)
         else -> UIUtil.getListBackground()
+    }
+
+    // --- visual helpers --------------------------------------------------------
+
+    /** A panel painted as a rounded rectangle with a subtle fill and border. */
+    private class RoundedPanel : JPanel() {
+        private val arc = JBUI.scale(12)
+
+        init {
+            isOpaque = false
+        }
+
+        override fun paintComponent(g: Graphics) {
+            val g2 = g.create() as Graphics2D
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                g2.color = ColorUtil.mix(UIUtil.getListBackground(), UIUtil.getLabelForeground(), 0.07)
+                g2.fillRoundRect(0, 0, width, height, arc, arc)
+                g2.color = JBColor.border()
+                g2.drawRoundRect(0, 0, width - 1, height - 1, arc, arc)
+            } finally {
+                g2.dispose()
+            }
+            super.paintComponent(g)
+        }
+
+        override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
+    }
+
+    /** A small filled circle status dot. */
+    private class DotIcon(private val color: Color, private val d: Int = JBUI.scale(9)) : Icon {
+        override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+            val g2 = g.create() as Graphics2D
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                g2.color = color
+                g2.fillOval(x, y, d, d)
+            } finally {
+                g2.dispose()
+            }
+        }
+
+        override fun getIconWidth() = d
+        override fun getIconHeight() = d
+    }
+
+    /** A small rotating arc spinner that animates only while showing. */
+    private class Spinner(private val color: Color) : JComponent() {
+        private val sizePx = JBUI.scale(14)
+        private var angle = 0
+        private val timer = Timer(80) { angle = (angle + 30) % 360; repaint() }
+
+        init {
+            preferredSize = Dimension(sizePx, sizePx)
+            isOpaque = false
+        }
+
+        override fun addNotify() {
+            super.addNotify()
+            timer.start()
+        }
+
+        override fun removeNotify() {
+            timer.stop()
+            super.removeNotify()
+        }
+
+        override fun paintComponent(g: Graphics) {
+            val g2 = g.create() as Graphics2D
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                g2.color = color
+                g2.stroke = BasicStroke(JBUI.scale(2).toFloat(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                val pad = JBUI.scale(2)
+                g2.drawArc(pad, pad, width - 2 * pad, height - 2 * pad, angle, 280)
+            } finally {
+                g2.dispose()
+            }
+        }
+
+        override fun getMaximumSize(): Dimension = preferredSize
     }
 }
