@@ -183,8 +183,13 @@ class FuguAppServerClient(
 
     private fun startTurn(prompt: String) {
         val tid = threadId ?: return
+        val mode = FuguSettings.getInstance().permissionModeEnum
         val params = buildJsonObject {
             put("threadId", tid)
+            // Apply the current mode per-turn so the chat "Mode" dropdown takes effect
+            // without restarting the thread. (Sandbox is fixed at thread start; a full
+            // sandbox change — e.g. Plan/Agent — applies on the next New Conversation.)
+            put("approvalPolicy", if (mode.bypass) "never" else mode.approval)
             put("input", buildJsonArray {
                 add(buildJsonObject {
                     put("type", "text")

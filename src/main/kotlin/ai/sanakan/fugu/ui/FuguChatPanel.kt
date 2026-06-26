@@ -4,6 +4,7 @@ import ai.sanakan.fugu.core.ChatMessage
 import ai.sanakan.fugu.core.FuguSession
 import ai.sanakan.fugu.core.FuguSetup
 import ai.sanakan.fugu.core.ProjectFiles
+import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
 import com.intellij.icons.AllIcons
@@ -19,6 +20,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
@@ -66,6 +68,11 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         isEditable = true
         selectedItem = session.model
         toolTipText = "Model"
+    }
+    private val modeCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
+        renderer = SimpleListCellRenderer.create("") { it.modeLabel }
+        selectedItem = FuguSettings.getInstance().permissionModeEnum
+        toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
     private val sendButton = JButton("Send")
     private val statusLabel = JBLabel("Ready").apply {
@@ -187,8 +194,12 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
             isOpaque = false
             add(JBLabel("Model: ").apply { foreground = JBColor.GRAY })
             add(modelCombo)
+            add(javax.swing.Box.createHorizontalStrut(JBUI.scale(10)))
+            add(JBLabel("Mode: ").apply { foreground = JBColor.GRAY })
+            add(modeCombo)
         }
-        modelCombo.maximumSize = Dimension(JBUI.scale(160), modelCombo.preferredSize.height)
+        modelCombo.maximumSize = Dimension(JBUI.scale(150), modelCombo.preferredSize.height)
+        modeCombo.maximumSize = Dimension(JBUI.scale(110), modeCombo.preferredSize.height)
         controls.add(left, BorderLayout.WEST)
         controls.add(sendButton, BorderLayout.EAST)
         composer.add(controls, BorderLayout.SOUTH)
@@ -211,6 +222,14 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         modelCombo.addActionListener {
             (modelCombo.editor.item as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { session.model = it }
+        }
+
+        modeCombo.addActionListener {
+            (modeCombo.selectedItem as? FuguPermissionMode)?.let { mode ->
+                FuguSettings.getInstance().permissionMode = mode.name
+                modeCombo.toolTipText = mode.display
+                statusLabel.text = "Mode: ${mode.modeLabel} — ${mode.display}"
+            }
         }
     }
 

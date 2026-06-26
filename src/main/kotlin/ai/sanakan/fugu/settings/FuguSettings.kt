@@ -12,15 +12,17 @@ import com.intellij.util.xmlb.XmlSerializerUtil
  * runs non-interactively — there is no channel to answer a prompt mid-turn.
  */
 enum class FuguPermissionMode(
+    /** Short, user-facing mode name shown in the chat dropdown. */
+    val modeLabel: String,
     val display: String,
     val sandbox: String,
     val approval: String,
     val bypass: Boolean,
 ) {
-    ASK("Ask before each edit/command (app-server)", "workspace-write", "on-request", false),
-    READ_ONLY("Read-only (plan, no edits)", "read-only", "never", false),
-    ACCEPT_EDITS("Auto-edit workspace", "workspace-write", "never", false),
-    FULL_ACCESS("Full access (bypass sandbox)", "danger-full-access", "never", true);
+    ASK("Default", "Ask before each edit or command", "workspace-write", "on-request", false),
+    ACCEPT_EDITS("Auto", "Auto-edit the workspace, no prompts", "workspace-write", "never", false),
+    FULL_ACCESS("Agent", "Full access — no sandbox, no prompts", "danger-full-access", "never", true),
+    READ_ONLY("Plan", "Read-only — inspect/plan, no edits", "read-only", "never", false);
 
     companion object {
         fun fromName(value: String?): FuguPermissionMode =
