@@ -24,8 +24,31 @@ def send(obj):
 def main():
     server_req_id = 1000
     last_req_id = None
+    pending = {}  # server-request id -> "elicit" | "approval"
     cur_thread = THREAD_ID
     cur_turn = "turn1"
+    long_cmd = "bash -lc 'set -euo pipefail; grep -rn TODO src | sort | uniq -c | sort -rn | head -20'"
+
+    def run_command_and_ask_approval():
+        nonlocal server_req_id, last_req_id
+        send({"method": "item/started", "params": {
+            "threadId": cur_thread, "turnId": cur_turn,
+            "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd, "status": "in_progress"},
+        }})
+        import time as _t
+        _t.sleep(1.0)
+        send({"method": "item/completed", "params": {
+            "threadId": cur_thread, "turnId": cur_turn,
+            "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd,
+                     "aggregatedOutput": "12 src/foo.kt\n3 src/bar.kt", "exit_code": 0, "status": "completed"},
+        }})
+        last_req_id = server_req_id
+        server_req_id += 1
+        pending[last_req_id] = "approval"
+        send({"id": last_req_id, "method": "item/fileChange/requestApproval", "params": {
+            "threadId": cur_thread, "turnId": cur_turn, "itemId": "i2",
+            "reason": "Append a setup note to README.md",
+        }})
 
     for line in sys.stdin:
         line = line.strip()
@@ -70,52 +93,57 @@ def main():
                 "threadId": cur_thread, "turnId": cur_turn,
                 "item": {"type": "agentMessage", "id": "i1", "text": "I'd like to update README.md."},
             }})
-            # A command: started (spinner) → completed (green). Long command → accordion.
-            long_cmd = "bash -lc 'set -euo pipefail; grep -rn TODO src | sort | uniq -c | sort -rn | head -20'"
-            send({"method": "item/started", "params": {
-                "threadId": cur_thread, "turnId": cur_turn,
-                "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd, "status": "in_progress"},
-            }})
-            import time as _t
-            _t.sleep(1.0)
-            send({"method": "item/completed", "params": {
-                "threadId": cur_thread, "turnId": cur_turn,
-                "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd,
-                         "aggregatedOutput": "12 src/foo.kt\n3 src/bar.kt", "exit_code": 0, "status": "completed"},
-            }})
-            # Ask the client to approve the file change before applying it.
-            last_req_id = server_req_id
+            # First, ask the user to choose (MCP elicitation with an enum).
+            eid = server_req_id
             server_req_id += 1
-            send({"id": last_req_id, "method": "item/fileChange/requestApproval", "params": {
-                "threadId": cur_thread, "turnId": cur_turn, "itemId": "i2",
-                "reason": "Append a setup note to README.md",
+            pending[eid] = "elicit"
+            send({"id": eid, "method": "mcpServer/elicitation/request", "params": {
+                "serverName": "demo", "threadId": cur_thread, "turnId": cur_turn, "mode": "form",
+                "message": "Which color theme should the new page use?",
+                "requestedSchema": {
+                    "type": "object",
+                    "properties": {
+                        "theme": {"type": "string", "title": "Theme", "enum": ["light", "dark", "auto"]},
+                        "note": {"type": "string", "title": "Extra note (optional)"},
+                    },
+                    "required": ["theme"],
+                },
             }})
 
         elif method == "turn/interrupt":
             send({"id": mid, "result": {}})
 
         elif mid is not None and method is None:
-            # A response from the client — the approval decision.
-            decision = (msg.get("result") or {}).get("decision", "decline")
-            applied = decision in ("accept", "acceptForSession")
-            send({"method": "item/completed", "params": {
-                "threadId": cur_thread, "turnId": cur_turn,
-                "item": {
-                    "type": "fileChange", "id": "i2",
-                    "status": "completed" if applied else "declined",
-                    "changes": [{
-                        "kind": "modified", "path": "README.md",
-                        "diff": "--- a/README.md\n+++ b/README.md\n-old line\n+new line 1\n+new line 2\n+new line 3",
-                    }],
-                },
-            }})
-            send({"method": "serverRequest/resolved",
-                  "params": {"threadId": cur_thread, "requestId": last_req_id}})
-            send({"method": "item/completed", "params": {
-                "threadId": cur_thread, "turnId": cur_turn,
-                "item": {"type": "agentMessage", "id": "i3",
-                         "text": "Applied the change." if applied else "Okay, I skipped the edit."},
-            }})
+            kind = pending.pop(mid, "approval")
+            if kind == "elicit":
+                content = (msg.get("result") or {}).get("content") or {}
+                theme = content.get("theme", "(none)")
+                send({"method": "item/completed", "params": {
+                    "threadId": cur_thread, "turnId": cur_turn,
+                    "item": {"type": "agentMessage", "id": "i1b", "text": f"Using the {theme} theme."},
+                }})
+                run_command_and_ask_approval()
+            else:
+                decision = (msg.get("result") or {}).get("decision", "decline")
+                applied = decision in ("accept", "acceptForSession")
+                send({"method": "item/completed", "params": {
+                    "threadId": cur_thread, "turnId": cur_turn,
+                    "item": {
+                        "type": "fileChange", "id": "i2",
+                        "status": "completed" if applied else "declined",
+                        "changes": [{
+                            "kind": "modified", "path": "README.md",
+                            "diff": "--- a/README.md\n+++ b/README.md\n-old line\n+new line 1\n+new line 2\n+new line 3",
+                        }],
+                    },
+                }})
+                send({"method": "serverRequest/resolved",
+                      "params": {"threadId": cur_thread, "requestId": mid}})
+                send({"method": "item/completed", "params": {
+                    "threadId": cur_thread, "turnId": cur_turn,
+                    "item": {"type": "agentMessage", "id": "i3",
+                             "text": "Applied the change." if applied else "Okay, I skipped the edit."},
+                }})
             send({"method": "turn/completed", "params": {
                 "threadId": cur_thread,
                 "turn": {"id": cur_turn, "status": "completed", "usage": {"output_tokens": 42}},

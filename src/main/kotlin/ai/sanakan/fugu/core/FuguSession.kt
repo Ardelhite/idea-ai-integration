@@ -7,8 +7,12 @@ import ai.sanakan.fugu.cli.FuguAppServerClient
 import ai.sanakan.fugu.cli.FuguCliClient
 import ai.sanakan.fugu.cli.FuguEvent
 import ai.sanakan.fugu.cli.FuguTransport
+import ai.sanakan.fugu.cli.PromptAction
+import ai.sanakan.fugu.cli.UserPrompt
+import ai.sanakan.fugu.cli.UserPromptKind
 import ai.sanakan.fugu.settings.FuguSettings
 import ai.sanakan.fugu.settings.FuguTransportKind
+import ai.sanakan.fugu.ui.FuguUserInputDialog
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
@@ -216,6 +220,17 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         }
         notify { it.onStatus("Approval: ${decision.wire}") }
         respond(decision)
+    }
+
+    override fun onUserInput(prompt: UserPrompt, respond: (PromptAction, Map<String, List<String>>) -> Unit) = onEdt {
+        val dialog = FuguUserInputDialog(project, prompt)
+        if (dialog.showAndGet()) {
+            respond(PromptAction.ACCEPT, dialog.answers())
+        } else {
+            // Elicitation distinguishes decline (skip) from cancel; tool input only cares
+            // that no answers came back.
+            respond(if (prompt.kind == UserPromptKind.ELICITATION) PromptAction.CANCEL else PromptAction.DECLINE, emptyMap())
+        }
     }
 
     // --- internals -------------------------------------------------------------

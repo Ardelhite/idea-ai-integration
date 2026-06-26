@@ -271,6 +271,8 @@ class FuguAppServerClient(
         when (method) {
             "item/fileChange/requestApproval" -> approve(id, ApprovalKind.FILE_CHANGE, params)
             "item/commandExecution/requestApproval" -> approve(id, ApprovalKind.COMMAND, params)
+            "mcpServer/elicitation/request" -> elicit(id, params)
+            "item/tool/requestUserInput" -> requestUserInput(id, params)
             else -> respondError(id, -32601, "unsupported request: $method")
         }
     }
@@ -285,6 +287,117 @@ class FuguAppServerClient(
             respondResult(id, buildJsonObject { put("decision", decision.wire) })
         }
     }
+
+    // --- structured user-input prompts -----------------------------------------
+
+    /** MCP elicitation: render the requested schema as a form, reply {action, content}. */
+    private fun elicit(id: JsonElement, params: JsonObject?) {
+        // "url" mode: just open the link and accept — there is no form to fill.
+        if (params?.get("mode").str() == "url") {
+            val url = params?.get("url").str()
+            val prompt = UserPrompt(UserPromptKind.ELICITATION, params?.get("message").str(),
+                listOfNotNull(url?.let { PromptField("url", "Open URL", it, PromptFieldType.TEXT, required = false) }))
+            listener.onUserInput(prompt) { action, _ ->
+                respondResult(id, buildJsonObject { put("action", actionWire(action)) })
+            }
+            return
+        }
+        val schema = params?.get("requestedSchema")?.jsonObject
+        val fields = parseElicitationSchema(schema)
+        val prompt = UserPrompt(UserPromptKind.ELICITATION, params?.get("message").str(), fields)
+        listener.onUserInput(prompt) { action, answers ->
+            respondResult(id, buildJsonObject {
+                put("action", actionWire(action))
+                if (action == PromptAction.ACCEPT) put("content", elicitationContent(fields, answers))
+            })
+        }
+    }
+
+    /** Codex tool requestUserInput (experimental): questions with options, reply {answers}. */
+    private fun requestUserInput(id: JsonElement, params: JsonObject?) {
+        val questions = params?.get("questions") as? JsonArray ?: JsonArray(emptyList())
+        val fields = questions.mapNotNull { q -> (q as? JsonObject)?.let { parseQuestion(it) } }
+        val prompt = UserPrompt(UserPromptKind.TOOL_INPUT, null, fields)
+        listener.onUserInput(prompt) { action, answers ->
+            val use = if (action == PromptAction.ACCEPT) answers else emptyMap()
+            respondResult(id, buildJsonObject {
+                put("answers", buildJsonObject {
+                    for ((qid, values) in use) {
+                        put(qid, buildJsonObject { put("answers", buildJsonArray { values.forEach { add(it) } }) })
+                    }
+                })
+            })
+        }
+    }
+
+    private fun actionWire(a: PromptAction) = when (a) {
+        PromptAction.ACCEPT -> "accept"
+        PromptAction.DECLINE -> "decline"
+        PromptAction.CANCEL -> "cancel"
+    }
+
+    private fun parseQuestion(q: JsonObject): PromptField {
+        val opts = (q["options"] as? JsonArray)?.mapNotNull { o ->
+            (o as? JsonObject)?.let { PromptOption(it["label"].str() ?: "", it["label"].str() ?: "") }
+        } ?: emptyList()
+        val type = when {
+            opts.isNotEmpty() -> PromptFieldType.SINGLE_SELECT
+            else -> PromptFieldType.TEXT
+        }
+        return PromptField(
+            id = q["id"].str() ?: q["header"].str() ?: "answer",
+            title = q["header"].str() ?: q["question"].str() ?: "",
+            description = q["question"].str(),
+            type = type,
+            options = opts,
+            allowOther = q["is_other"].str() == "true" || opts.isEmpty(),
+            secret = q["is_secret"].str() == "true",
+        )
+    }
+
+    private fun parseElicitationSchema(schema: JsonObject?): List<PromptField> {
+        val props = schema?.get("properties")?.jsonObject ?: return emptyList()
+        val required = (schema["required"] as? JsonArray)?.mapNotNull { it.str() }?.toSet() ?: emptySet()
+        return props.entries.map { (key, value) ->
+            val o = value.jsonObject
+            val title = o["title"].str() ?: key
+            val desc = o["description"].str()
+            val typeStr = o["type"].str()
+            val enumVals = (o["enum"] as? JsonArray)?.mapNotNull { it.str() }
+            val oneOf = (o["oneOf"] as? JsonArray)?.mapNotNull { it as? JsonObject }
+            val enumNames = (o["enumNames"] as? JsonArray)?.mapNotNull { it.str() }
+            when {
+                typeStr == "array" -> {
+                    val items = o["items"]?.jsonObject
+                    val itemEnum = (items?.get("enum") as? JsonArray)?.mapNotNull { it.str() } ?: emptyList()
+                    PromptField(key, title, desc, PromptFieldType.MULTI_SELECT,
+                        itemEnum.map { PromptOption(it, it) }, required = key in required)
+                }
+                !oneOf.isNullOrEmpty() -> PromptField(key, title, desc, PromptFieldType.SINGLE_SELECT,
+                    oneOf.map { PromptOption(it["const"].str() ?: "", it["title"].str() ?: it["const"].str() ?: "") },
+                    required = key in required)
+                enumVals != null -> PromptField(key, title, desc, PromptFieldType.SINGLE_SELECT,
+                    enumVals.mapIndexed { i, v -> PromptOption(v, enumNames?.getOrNull(i) ?: v) },
+                    required = key in required)
+                typeStr == "boolean" -> PromptField(key, title, desc, PromptFieldType.BOOLEAN, required = key in required)
+                typeStr == "number" || typeStr == "integer" -> PromptField(key, title, desc, PromptFieldType.NUMBER, required = key in required)
+                else -> PromptField(key, title, desc, PromptFieldType.TEXT, required = key in required)
+            }
+        }
+    }
+
+    private fun elicitationContent(fields: List<PromptField>, answers: Map<String, List<String>>): JsonObject =
+        buildJsonObject {
+            for (field in fields) {
+                val values = answers[field.id] ?: continue
+                when (field.type) {
+                    PromptFieldType.MULTI_SELECT -> put(field.id, buildJsonArray { values.forEach { add(it) } })
+                    PromptFieldType.BOOLEAN -> put(field.id, values.firstOrNull() == "true")
+                    PromptFieldType.NUMBER -> values.firstOrNull()?.toDoubleOrNull()?.let { put(field.id, it) }
+                    else -> values.firstOrNull()?.let { put(field.id, it) }
+                }
+            }
+        }
 
     private fun handleNotification(method: String, params: JsonObject?) {
         when (method) {
