@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""
+Mock Codex/Fugu CLI — emulates `codex exec --json` so the IntelliJ plugin can be
+exercised end-to-end without the real Codex CLI + Sakana provider installed.
+
+The plugin invokes it as:
+    mock-fugu exec [resume <THREAD_ID>] --json -m fugu \
+              -c model_provider=sakana --sandbox workspace-write -a never \
+              --skip-git-repo-check "<prompt>"
+
+The prompt is the trailing positional arg. Emits the `thread.* / turn.* / item.*`
+JSONL event schema the plugin's StreamJsonParser understands.
+"""
+import json
+import sys
+import time
+
+
+def emit(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+def parse_args(argv):
+    model = "fugu"
+    thread_id = "thread_mock_0001"
+    if "-m" in argv:
+        model = argv[argv.index("-m") + 1]
+    elif "--model" in argv:
+        model = argv[argv.index("--model") + 1]
+    if "resume" in argv:
+        idx = argv.index("resume") + 1
+        if idx < len(argv) and not argv[idx].startswith("-"):
+            thread_id = argv[idx]
+    # Prompt is the trailing positional argument.
+    prompt = argv[-1] if argv and not argv[-1].startswith("-") else ""
+    return model, thread_id, prompt
+
+
+def main():
+    argv = sys.argv[1:]
+    model, thread_id, prompt = parse_args(argv)
+
+    emit({"type": "thread.started", "thread_id": thread_id, "model": model})
+    emit({"type": "turn.started"})
+
+    emit({"type": "item.completed", "item": {
+        "id": "item_1", "item_type": "agent_message",
+        "text": f"(mock {model}) You asked: {prompt!r}. Let me look around.",
+    }})
+
+    emit({"type": "item.started", "item": {
+        "id": "item_2", "item_type": "command_execution",
+        "command": "ls -la", "status": "in_progress",
+    }})
+    time.sleep(0.05)
+    emit({"type": "item.completed", "item": {
+        "id": "item_2", "item_type": "command_execution",
+        "command": "ls -la", "aggregated_output": "README.md\nbuild.gradle.kts\nsrc/",
+        "exit_code": 0,
+    }})
+
+    emit({"type": "item.completed", "item": {
+        "id": "item_3", "item_type": "file_change",
+        "changes": [{"kind": "modified", "path": "README.md"}],
+    }})
+
+    emit({"type": "item.completed", "item": {
+        "id": "item_4", "item_type": "agent_message",
+        "text": "Done — updated README.md. Anything else?",
+    }})
+
+    emit({"type": "turn.completed", "usage": {
+        "input_tokens": 1200, "cached_input_tokens": 0, "output_tokens": 64,
+    }})
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (BrokenPipeError, KeyboardInterrupt):
+        pass

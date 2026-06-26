@@ -1,0 +1,36 @@
+<idea-plugin>
+    <id>ai.sanakan.fugu.idea</id>
+    <name>Sanakan AI Fugu</name>
+    <vendor email="harima42@gmail.com">Sanakan</vendor>
+
+    <description><![CDATA[
+        <p>IntelliJ integration for <b>Sanakan AI Fugu</b> (and <b>fugu-ultra</b>).</p>
+        <p>Drives the Fugu CLI as a subprocess over a streaming-JSON protocol — chat with
+        the agent, watch it edit files in your project, and review changes inline.
+        Inspired by the architecture of open-source Claude Code GUIs.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionId="com.intellij">
+        <!-- Application-level settings -->
+        <applicationService serviceImplementation="ai.sanakan.fugu.settings.FuguSettings"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="ai.sanakan.fugu.settings.FuguConfigurable"
+                id="ai.sanakan.fugu.settings.FuguConfigurable"
+                displayName="Sanakan AI Fugu"/>
+
+        <!-- Per-project session service -->
+        <projectService serviceImplementation="ai.sanakan.fugu.core.FuguSession"/>
+
+        <!-- Chat tool window -->
+        <toolWindow
+                id="Fugu"
+                anchor="right"
+                icon="AllIcons.Toolwindows.ToolWindowMessages"
+                factoryClass="ai.sanakan.fugu.ui.FuguToolWindowFactory"/>
+    </extensions>
+
+    <applicationListeners/>
+</idea-plugin>

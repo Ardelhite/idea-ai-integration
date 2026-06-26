@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+Mock `codex app-server` — speaks the bidirectional JSON-RPC (newline-delimited,
+no `jsonrpc` field) the plugin's FuguAppServerClient expects, so the approval
+flow can be exercised without the real Codex CLI.
+
+Invoked as: mock-codex-appserver app-server
+
+Flow per turn: acks turn/start, emits an agent message, then sends a
+`item/fileChange/requestApproval` SERVER REQUEST and waits for the client's
+`{ "decision": ... }` response before either applying or skipping the change.
+"""
+import json
+import sys
+
+THREAD_ID = "thread_mock_app_1"
+
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+def main():
+    server_req_id = 1000
+    last_req_id = None
+    cur_thread = THREAD_ID
+    cur_turn = "turn1"
+
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        method = msg.get("method")
+        mid = msg.get("id")
+
+        if method == "initialize":
+            send({"id": mid, "result": {
+                "userAgent": "mock-app-server/0.1",
+                "codexHome": ".", "platformFamily": "mac", "platformOs": "darwin",
+            }})
+
+        elif method == "initialized":
+            pass
+
+        elif method in ("thread/start", "thread/resume"):
+            params = msg.get("params", {})
+            cur_thread = params.get("threadId", THREAD_ID)
+            send({"id": mid, "result": {
+                "thread": {"id": cur_thread, "status": "idle", "turns": []},
+                "model": params.get("model"),
+            }})
+
+        elif method == "turn/start":
+            params = msg.get("params", {})
+            cur_thread = params.get("threadId", cur_thread)
+            send({"id": mid, "result": {"turn": {"id": cur_turn, "items": [], "status": "inProgress"}}})
+            send({"method": "turn/started", "params": {"threadId": cur_thread, "turn": {"id": cur_turn}}})
+            send({"method": "item/completed", "params": {
+                "threadId": cur_thread, "turnId": cur_turn,
+                "item": {"type": "agentMessage", "id": "i1", "text": "I'd like to update README.md."},
+            }})
+            # Ask the client to approve the file change before applying it.
+            last_req_id = server_req_id
+            server_req_id += 1
+            send({"id": last_req_id, "method": "item/fileChange/requestApproval", "params": {
+                "threadId": cur_thread, "turnId": cur_turn, "itemId": "i2",
+                "reason": "Append a setup note to README.md",
+            }})
+
+        elif method == "turn/interrupt":
+            send({"id": mid, "result": {}})
+
+        elif mid is not None and method is None:
+            # A response from the client — the approval decision.
+            decision = (msg.get("result") or {}).get("decision", "decline")
+            applied = decision in ("accept", "acceptForSession")
+            send({"method": "item/completed", "params": {
+                "threadId": cur_thread, "turnId": cur_turn,
+                "item": {
+                    "type": "fileChange", "id": "i2",
+                    "status": "completed" if applied else "declined",
+                    "changes": [{"kind": "modified", "path": "README.md"}],
+                },
+            }})
+            send({"method": "serverRequest/resolved",
+                  "params": {"threadId": cur_thread, "requestId": last_req_id}})
+            send({"method": "item/completed", "params": {
+                "threadId": cur_thread, "turnId": cur_turn,
+                "item": {"type": "agentMessage", "id": "i3",
+                         "text": "Applied the change." if applied else "Okay, I skipped the edit."},
+            }})
+            send({"method": "turn/completed", "params": {
+                "threadId": cur_thread,
+                "turn": {"id": cur_turn, "status": "completed", "usage": {"output_tokens": 42}},
+            }})
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (BrokenPipeError, KeyboardInterrupt):
+        pass

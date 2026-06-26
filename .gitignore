@@ -1,0 +1,17 @@
+.gradle/
+build/
+out/
+*.log
+
+# IntelliJ Platform Gradle plugin caches / Kotlin daemon state
+.intellijPlatform/
+.kotlin/
+
+# IntelliJ project files (keep .idea out of VCS for this template)
+.idea/
+
+# Claude Code local (machine-specific) settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
