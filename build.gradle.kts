@@ -62,10 +62,26 @@ tasks {
         gradleVersion = "8.10.2"
     }
 
+    // Wipes the sandbox IDE's user state — the sample project (incl. its Karato
+    // session), and the IDE config (app settings, the stored API key, layout) and
+    // caches — so the next launch starts from scratch (Set up Fugu → Install Codex).
+    // The deployed plugin under .../plugins is intentionally left alone.
+    val sandboxName = "${providers.gradleProperty("platformType").get()}-${providers.gradleProperty("platformVersion").get()}"
+    val clearSandbox by registering(Delete::class) {
+        delete(
+            layout.buildDirectory.dir("sandbox-project"),
+            layout.buildDirectory.dir("idea-sandbox/$sandboxName/config"),
+            layout.buildDirectory.dir("idea-sandbox/$sandboxName/system"),
+            layout.buildDirectory.dir("idea-sandbox/$sandboxName/log"),
+        )
+    }
+
     // `./gradlew runIde` opens a throwaway sample project so the Karato tool
     // window is visible immediately (no New Project wizard). The mock transports
     // under tools/ can be pointed at via Settings → Tools → Karato.
     runIde {
+        // When both are requested ("Clear sample project" run config), clear first.
+        mustRunAfter(clearSandbox)
         val sampleDir = layout.buildDirectory.dir("sandbox-project")
         doFirst {
             val dir = sampleDir.get().asFile
