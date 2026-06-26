@@ -31,7 +31,7 @@ class SendButton(private val onClick: ActionListener) : JComponent() {
 
     init {
         cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-        font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(13f).toFloat())
+        font = Font(Font.SANS_SERIF, Font.BOLD, JBUI.scaleFontSize(13f))
         preferredSize = Dimension(JBUI.scale(96), JBUI.scale(30))
         addMouseListener(object : MouseAdapter() {
             override fun mouseEntered(e: MouseEvent) { hover = true; repaint() }
