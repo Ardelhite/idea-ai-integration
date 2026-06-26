@@ -1,6 +1,7 @@
 package ai.sanakan.fugu.settings
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
@@ -22,7 +23,15 @@ class FuguConfigurable : Configurable {
     private val transportCombo = ComboBox(DefaultComboBoxModel(FuguTransportKind.entries.toTypedArray())).apply {
         renderer = SimpleListCellRenderer.create("") { it.display }
     }
-    private val cliPathField = TextFieldWithBrowseButton().apply { textField.columns = 30 }
+    private val cliPathField = TextFieldWithBrowseButton().apply {
+        textField.columns = 30
+        addBrowseFolderListener(
+            "Select the Codex CLI",
+            "Path to the codex / codex-fugu executable (or a mock under tools/)",
+            null,
+            FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor(),
+        )
+    }
     private val modelCombo = ComboBox(DefaultComboBoxModel(FuguSettings.KNOWN_MODELS.toTypedArray())).apply {
         isEditable = true
     }
