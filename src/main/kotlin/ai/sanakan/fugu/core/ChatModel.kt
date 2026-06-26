@@ -18,6 +18,16 @@ data class ToolCall(
     val target: String?
         get() = listOf("file_path", "path", "command", "pattern", "url")
             .firstNotNullOfOrNull { key -> (input[key] as? JsonPrimitive)?.contentOrNull }
+
+    /** Full shell command (for command-execution cards). */
+    val command: String?
+        get() = (input["command"] as? JsonPrimitive)?.contentOrNull
+
+    /** Lines added / removed by a file-change, when known (else 0). */
+    val added: Int
+        get() = (input["added"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
+    val removed: Int
+        get() = (input["removed"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
 }
 
 /**

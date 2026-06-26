@@ -70,6 +70,19 @@ def main():
                 "threadId": cur_thread, "turnId": cur_turn,
                 "item": {"type": "agentMessage", "id": "i1", "text": "I'd like to update README.md."},
             }})
+            # A command: started (spinner) → completed (green). Long command → accordion.
+            long_cmd = "bash -lc 'set -euo pipefail; grep -rn TODO src | sort | uniq -c | sort -rn | head -20'"
+            send({"method": "item/started", "params": {
+                "threadId": cur_thread, "turnId": cur_turn,
+                "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd, "status": "in_progress"},
+            }})
+            import time as _t
+            _t.sleep(1.0)
+            send({"method": "item/completed", "params": {
+                "threadId": cur_thread, "turnId": cur_turn,
+                "item": {"type": "commandExecution", "id": "cmd1", "command": long_cmd,
+                         "aggregatedOutput": "12 src/foo.kt\n3 src/bar.kt", "exit_code": 0, "status": "completed"},
+            }})
             # Ask the client to approve the file change before applying it.
             last_req_id = server_req_id
             server_req_id += 1
@@ -90,7 +103,10 @@ def main():
                 "item": {
                     "type": "fileChange", "id": "i2",
                     "status": "completed" if applied else "declined",
-                    "changes": [{"kind": "modified", "path": "README.md"}],
+                    "changes": [{
+                        "kind": "modified", "path": "README.md",
+                        "diff": "--- a/README.md\n+++ b/README.md\n-old line\n+new line 1\n+new line 2\n+new line 3",
+                    }],
                 },
             }})
             send({"method": "serverRequest/resolved",

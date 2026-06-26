@@ -326,12 +326,19 @@ class FuguAppServerClient(
                 item["aggregatedOutput"].str() ?: "",
                 failed(item),
             )
-            "fileChange" -> toolEvent(
-                completed, id, "Edit",
-                buildJsonObject { fileTarget(item)?.let { put("file_path", it) } },
-                fileSummary(item),
-                failed(item),
-            )
+            "fileChange" -> {
+                val (added, removed) = fileChangeStats(item)
+                toolEvent(
+                    completed, id, "Edit",
+                    buildJsonObject {
+                        fileTarget(item)?.let { put("file_path", it) }
+                        put("added", added)
+                        put("removed", removed)
+                    },
+                    fileSummary(item),
+                    failed(item),
+                )
+            }
             "mcpToolCall" -> toolEvent(completed, id, item["tool"].str() ?: "MCP", JsonObject(emptyMap()), "", failed(item))
             "webSearch" -> toolEvent(
                 completed, id, "WebSearch",
@@ -366,6 +373,39 @@ class FuguAppServerClient(
             "$kind: ${c["path"].str() ?: "?"}"
         }
     }
+
+    @Volatile private var fileChangeLogged = false
+
+    /** Lines added / removed for a file change, from numeric stats or a unified diff. */
+    private fun fileChangeStats(item: JsonObject): Pair<Int, Int> {
+        val changes = item["changes"] as? JsonArray ?: return 0 to 0
+        if (!fileChangeLogged) {
+            fileChangeLogged = true
+            log.info("fileChange item shape: ${item.toString().take(800)}")
+        }
+        var add = 0
+        var rem = 0
+        for (c in changes.mapNotNull { it as? JsonObject }) {
+            val a = intOf(c, "additions", "added", "linesAdded", "insertions")
+            val r = intOf(c, "deletions", "removed", "linesRemoved")
+            if (a != null || r != null) {
+                add += a ?: 0
+                rem += r ?: 0
+                continue
+            }
+            val diff = listOf("diff", "unifiedDiff", "unified_diff", "patch").firstNotNullOfOrNull { c[it].str() }
+            if (diff != null) {
+                for (line in diff.lineSequence()) {
+                    if (line.startsWith("+") && !line.startsWith("+++")) add++
+                    else if (line.startsWith("-") && !line.startsWith("---")) rem++
+                }
+            }
+        }
+        return add to rem
+    }
+
+    private fun intOf(o: JsonObject, vararg keys: String): Int? =
+        keys.firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() }
 
     private fun turnTokens(params: JsonObject?): Long? =
         params?.get("turn")?.jsonObject?.get("usage")?.jsonObject?.get("output_tokens")?.jsonPrimitive?.contentOrNull?.toLongOrNull()

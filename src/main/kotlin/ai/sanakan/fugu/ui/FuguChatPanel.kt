@@ -266,7 +266,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun addMessageComponent(message: ChatMessage) {
-        val comp = MessageComponent(message) { call ->
+        val comp = MessageComponent(message, project.basePath) { call ->
             call.target?.let { ProjectFiles.open(project, it) }
         }
         comp.alignmentX = Component.LEFT_ALIGNMENT
