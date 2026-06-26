@@ -171,6 +171,13 @@ class FuguAppServerClient(
         val method = if (threadId != null) "thread/resume" else "thread/start"
         request(method, params) { result, error ->
             if (error != null) {
+                // A stale / invalid / expired thread id (e.g. left over from the mock or a
+                // different provider) can't be resumed — start a fresh thread instead.
+                if (method == "thread/resume") {
+                    threadId = null
+                    openThread()
+                    return@request
+                }
                 listener.onStartFailed("$method failed: ${error["message"].str()}")
                 stage = Stage.IDLE
                 return@request

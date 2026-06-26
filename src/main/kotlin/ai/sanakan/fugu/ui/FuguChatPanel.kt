@@ -337,14 +337,10 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         session.submit(prompt)
     }
 
-    /** Appends `@<relative-path>` mentions for any attached files to the prompt. */
+    /** Appends `@<absolute-path>` mentions for any attached files to the prompt. */
     private fun buildPrompt(text: String, refs: List<VirtualFile>): String {
         if (refs.isEmpty()) return text
-        val base = project.basePath?.trimEnd('/')
-        val mentions = refs.joinToString("\n") { f ->
-            val rel = if (base != null && f.path.startsWith("$base/")) f.path.removePrefix("$base/") else f.path
-            "@$rel"
-        }
+        val mentions = refs.joinToString("\n") { "@${it.path}" }
         return if (text.isBlank()) "Referenced files:\n$mentions" else "$text\n\nReferenced files:\n$mentions"
     }
 
