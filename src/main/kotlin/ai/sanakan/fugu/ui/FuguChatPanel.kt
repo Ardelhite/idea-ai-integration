@@ -15,6 +15,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
@@ -347,8 +349,16 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun showFilePicker(atOffset: Int) {
-        val files = searchProjectFiles()
-        if (files.isEmpty()) return
+        // Enumerating project content is a slow op — do it off the EDT, then pop up.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val files = searchProjectFiles()
+            ApplicationManager.getApplication().invokeLater({
+                if (files.isNotEmpty() && !project.isDisposed) showFilePopup(atOffset, files)
+            }, ModalityState.any())
+        }
+    }
+
+    private fun showFilePopup(atOffset: Int, files: List<VirtualFile>) {
         val base = project.basePath?.trimEnd('/')
         val step = object : BaseListPopupStep<VirtualFile>("Reference a file", files) {
             override fun isSpeedSearchEnabled() = true
