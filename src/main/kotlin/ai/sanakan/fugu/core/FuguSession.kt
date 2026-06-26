@@ -64,6 +64,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
     /** Item id of the message currently being streamed, to detect message boundaries. */
     private var streamingItemId: String? = null
+    private var streamingTextBlock: TextBlock? = null
 
     /** Cumulative output tokens this session (Sakana exposes no account-level usage API). */
     private var sessionOutputTokens = 0L
@@ -113,6 +114,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         currentAssistant = null
         turnActive = false
         streamingItemId = null
+        streamingTextBlock = null
         sessionOutputTokens = 0L
         notify { it.onStatus("New conversation") }
     }
@@ -126,39 +128,46 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
             is FuguEvent.AgentMessage -> {
                 val msg = ensureAssistant()
-                if (msg.text.isNotEmpty()) msg.appendText("\n\n")
-                msg.appendText(event.text)
+                msg.addText(event.text)      // a finalized message becomes its own block
+                streamingTextBlock = null
+                streamingItemId = null
                 notify { it.onMessageUpdated(msg) }
             }
 
             is FuguEvent.AgentMessageDelta -> {
                 val msg = ensureAssistant()
-                // A new message id within the turn → separate it from prior content.
-                if (streamingItemId != event.itemId) {
-                    if (msg.text.isNotEmpty()) msg.appendText("\n\n")
+                // A new message id (or text after a tool) starts a fresh text block.
+                if (streamingItemId != event.itemId || streamingTextBlock == null) {
+                    val block = TextBlock()
+                    msg.blocks.add(block)
+                    streamingTextBlock = block
                     streamingItemId = event.itemId
                 }
-                msg.appendText(event.text)
+                streamingTextBlock?.text?.append(event.text)
                 notify { it.onMessageUpdated(msg) }
             }
 
             is FuguEvent.ToolStarted -> {
                 val msg = ensureAssistant()
-                if (msg.toolCalls.none { it.id == event.id }) {
-                    msg.toolCalls.add(ToolCall(event.id, event.name, event.input))
+                if (msg.findTool(event.id) == null) {
+                    msg.addTool(ToolCall(event.id, event.name, event.input))
+                    streamingTextBlock = null     // next prose goes after this tool card
+                    streamingItemId = null
                     notify { it.onMessageUpdated(msg) }
                 }
             }
 
             is FuguEvent.ToolCompleted -> {
                 val msg = ensureAssistant()
-                val existing = msg.toolCalls.firstOrNull { it.id == event.id }
+                val existing = msg.findTool(event.id)
                 if (existing != null) {
                     existing.result = event.result
                     existing.isError = event.isError
                 } else {
-                    msg.toolCalls.add(ToolCall(event.id, event.name, event.input, event.result, event.isError))
+                    msg.addTool(ToolCall(event.id, event.name, event.input, event.result, event.isError))
                 }
+                streamingTextBlock = null
+                streamingItemId = null
                 notify { it.onMessageUpdated(msg) }
                 refreshProjectFiles()
             }
@@ -238,6 +247,8 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         currentAssistant?.let { return it }
         val msg = ChatMessage(ChatRole.ASSISTANT).apply { streaming = true; model = this@FuguSession.model }
         currentAssistant = msg
+        streamingItemId = null
+        streamingTextBlock = null
         messages.add(msg)
         notify { it.onMessageAdded(msg) }
         return msg
@@ -249,6 +260,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         currentAssistant?.streaming = false
         currentAssistant = null
         streamingItemId = null
+        streamingTextBlock = null
         notify { it.onTurnFinished() }
         notify { it.onStatus("Ready") }
     }
@@ -263,8 +275,8 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
     /** Appends a line to an existing system note. Call on the EDT. */
     fun appendSystemNote(msg: ChatMessage, line: String) {
-        if (msg.text.isNotEmpty()) msg.appendText("\n")
-        msg.appendText(line)
+        if (!msg.isEmpty) msg.appendToLastText("\n")
+        msg.appendToLastText(line)
         notify { it.onMessageUpdated(msg) }
     }
 

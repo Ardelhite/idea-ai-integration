@@ -30,16 +30,25 @@ data class ToolCall(
         get() = (input["removed"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
 }
 
+/** An ordered piece of an assistant turn: either prose or a tool call. */
+sealed interface MessageBlock
+
+class TextBlock(initial: String = "") : MessageBlock {
+    val text = StringBuilder(initial)
+}
+
+class ToolBlock(val call: ToolCall) : MessageBlock
+
 /**
- * One entry in the chat transcript. Assistant entries accumulate streamed text
- * and any tool calls produced during the turn.
+ * One entry in the chat transcript. Assistant entries are an ordered list of
+ * [MessageBlock]s, so tool cards render inline at the point they happened rather
+ * than piling up at the bottom.
  */
 class ChatMessage(
     val role: ChatRole,
     initialText: String = "",
 ) {
-    val text = StringBuilder(initialText)
-    val toolCalls = mutableListOf<ToolCall>()
+    val blocks = mutableListOf<MessageBlock>()
 
     /** Model that produced an assistant message (shown as its header). */
     var model: String? = null
@@ -47,10 +56,26 @@ class ChatMessage(
     /** True while the assistant turn is still streaming. */
     var streaming: Boolean = false
 
-    fun appendText(s: String) {
-        text.append(s)
+    init {
+        if (initialText.isNotEmpty()) blocks.add(TextBlock(initialText))
     }
 
+    fun addText(s: String) {
+        blocks.add(TextBlock(s))
+    }
+
+    /** Appends to the trailing text block (or starts one) — for line-by-line notes. */
+    fun appendToLastText(s: String) {
+        (blocks.lastOrNull() as? TextBlock)?.text?.append(s) ?: blocks.add(TextBlock(s))
+    }
+
+    fun addTool(call: ToolCall) {
+        blocks.add(ToolBlock(call))
+    }
+
+    fun findTool(id: String): ToolCall? =
+        blocks.asSequence().filterIsInstance<ToolBlock>().firstOrNull { it.call.id == id }?.call
+
     val isEmpty: Boolean
-        get() = text.isEmpty() && toolCalls.isEmpty()
+        get() = blocks.isEmpty()
 }

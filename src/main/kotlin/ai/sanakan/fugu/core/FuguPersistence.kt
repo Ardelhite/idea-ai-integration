@@ -6,23 +6,23 @@ import kotlinx.serialization.json.put
 
 /**
  * Plain mutable beans persisted via IntelliJ's XML serializer. They mirror the
- * runtime [ChatMessage] / [ToolCall] model but use only serializer-friendly
- * fields (no [StringBuilder], no [JsonObject]). The full tool `input` is reduced
- * to a single [target] string, which is all the UI needs to re-render and to
- * re-open a changed file.
+ * runtime [ChatMessage] block model with serializer-friendly fields.
  */
-class PersistedTool {
-    var name: String = ""
-    var target: String? = null
-    var result: String? = null
-    var isError: Boolean = false
+class PersistedBlock {
+    var kind: String = "text" // "text" | "tool"
+    var text: String = ""
+    var toolName: String = ""
+    var toolTarget: String? = null
+    var toolResult: String? = null
+    var toolError: Boolean = false
+    var added: Int = 0
+    var removed: Int = 0
 }
 
 class PersistedMessage {
     var role: String = ChatRole.ASSISTANT.name
-    var text: String = ""
     var model: String? = null
-    var tools: MutableList<PersistedTool> = mutableListOf()
+    var blocks: MutableList<PersistedBlock> = mutableListOf()
 }
 
 class FuguSessionState {
@@ -34,34 +34,59 @@ class FuguSessionState {
 
 internal fun ChatMessage.toPersisted(): PersistedMessage = PersistedMessage().also { p ->
     p.role = role.name
-    p.text = text.toString()
     p.model = model
-    p.tools = toolCalls.mapTo(mutableListOf()) { call ->
-        PersistedTool().also {
-            it.name = call.name
-            it.target = call.target
-            it.result = call.result
-            it.isError = call.isError
+    p.blocks = blocks.mapTo(mutableListOf()) { b ->
+        PersistedBlock().also { pb ->
+            when (b) {
+                is TextBlock -> {
+                    pb.kind = "text"
+                    pb.text = b.text.toString()
+                }
+                is ToolBlock -> {
+                    pb.kind = "tool"
+                    pb.toolName = b.call.name
+                    pb.toolTarget = b.call.target
+                    pb.toolResult = b.call.result
+                    pb.toolError = b.call.isError
+                    pb.added = b.call.added
+                    pb.removed = b.call.removed
+                }
+            }
         }
     }
 }
 
 internal fun PersistedMessage.toRuntime(): ChatMessage {
     val runtimeRole = runCatching { ChatRole.valueOf(role) }.getOrDefault(ChatRole.ASSISTANT)
-    val msg = ChatMessage(runtimeRole, text).apply { model = this@toRuntime.model }
-    tools.forEach { t ->
-        msg.toolCalls.add(ToolCall(id = t.name + "@" + (t.target ?: ""), name = t.name, input = inputFor(t.name, t.target), result = t.result, isError = t.isError))
+    val msg = ChatMessage(runtimeRole).apply { model = this@toRuntime.model }
+    blocks.forEach { pb ->
+        if (pb.kind == "tool") {
+            msg.addTool(
+                ToolCall(
+                    id = pb.toolName + "@" + (pb.toolTarget ?: ""),
+                    name = pb.toolName,
+                    input = inputFor(pb),
+                    result = pb.toolResult,
+                    isError = pb.toolError,
+                ),
+            )
+        } else {
+            msg.addText(pb.text)
+        }
     }
     return msg
 }
 
-/** Reconstructs a minimal tool `input` so [ToolCall.target] resolves after reload. */
-private fun inputFor(name: String, target: String?): JsonObject {
-    if (target == null) return JsonObject(emptyMap())
-    val key = when (name) {
-        "Edit" -> "file_path"
-        "WebSearch" -> "pattern"
-        else -> "command"
+/** Reconstructs a minimal tool `input` so [ToolCall] accessors resolve after reload. */
+private fun inputFor(pb: PersistedBlock): JsonObject = buildJsonObject {
+    pb.toolTarget?.let {
+        val key = when (pb.toolName) {
+            "Edit" -> "file_path"
+            "WebSearch" -> "pattern"
+            else -> "command"
+        }
+        put(key, it)
     }
-    return buildJsonObject { put(key, target) }
+    put("added", pb.added)
+    put("removed", pb.removed)
 }
