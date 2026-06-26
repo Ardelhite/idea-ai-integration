@@ -13,31 +13,21 @@ import ai.sanakan.fugu.settings.FuguSettings
 import ai.sanakan.fugu.settings.FuguTransportKind
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.components.PersistentStateComponent
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.State
-import com.intellij.openapi.components.Storage
-import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Per-project session: bridges the [FuguCliClient] subprocess and the UI, and
- * persists the transcript + Codex thread id into the project's workspace file so
- * the conversation survives tool-window reopens and IDE restarts.
+ * One chat tab: bridges the Codex subprocess and the UI and holds the transcript
+ * + Codex thread id. Instances are owned by [FuguSessionManager], which persists
+ * them all into the project's workspace file so tabs survive restarts.
  *
  * One assistant bubble is built per turn; agent messages append text and tool
  * items appear as cards on that bubble. All listener callbacks are dispatched on
  * the EDT so the chat panel can mutate Swing state directly.
  */
-@Service(Service.Level.PROJECT)
-@State(
-    name = "ai.sanakan.fugu.FuguSession",
-    storages = [Storage(StoragePathMacros.WORKSPACE_FILE)],
-)
-class FuguSession(private val project: Project) : Disposable, FuguAgentListener, PersistentStateComponent<FuguSessionState> {
+class FuguSession(private val project: Project) : Disposable, FuguAgentListener {
 
     interface Listener {
         fun onMessageAdded(message: ChatMessage)
@@ -45,6 +35,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         fun onTurnStarted()
         fun onTurnFinished()
         fun onStatus(text: String)
+
+        /** The tab title changed (e.g. derived from the first user prompt). */
+        fun onTitleChanged(title: String) {}
 
         /** The agent wants a structured answer; render it inline and call [respond] once. */
         fun onUserPrompt(prompt: UserPrompt, respond: (PromptAction, Map<String, List<String>>) -> Unit) {}
@@ -55,6 +48,11 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
     private val listeners = CopyOnWriteArrayList<Listener>()
     val messages = mutableListOf<ChatMessage>()
+
+    /** Tab label; defaults to "Chat" and is derived from the first user prompt. */
+    var title: String = "Chat"
+        private set
+    private var titlePinned = false
 
     /** Selected model for this session; defaults from settings, changeable in UI. */
     var model: String = FuguSettings.getInstance().model
@@ -69,16 +67,27 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
     /** Cumulative output tokens this session (Sakana exposes no account-level usage API). */
     private var sessionOutputTokens = 0L
 
-    private val client: FuguTransport by lazy {
-        val dir = project.basePath ?: System.getProperty("user.dir")
-        when (FuguSettings.getInstance().transportKind) {
-            FuguTransportKind.EXEC -> FuguCliClient(dir, this)
-            FuguTransportKind.APP_SERVER -> FuguAppServerClient(dir, this)
+    // Created on first use only, so persisting untouched tabs never spawns a transport.
+    private var clientRef: FuguTransport? = null
+    private var pendingThreadId: String? = null
+    private val client: FuguTransport
+        get() {
+            clientRef?.let { return it }
+            val dir = project.basePath ?: System.getProperty("user.dir")
+            val created = when (FuguSettings.getInstance().transportKind) {
+                FuguTransportKind.EXEC -> FuguCliClient(dir, this)
+                FuguTransportKind.APP_SERVER -> FuguAppServerClient(dir, this)
+            }
+            pendingThreadId?.let { created.restoreThread(it) }
+            clientRef = created
+            return created
         }
-    }
 
     fun addListener(l: Listener) { listeners.add(l) }
     fun removeListener(l: Listener) { listeners.remove(l) }
+
+    /** Sets the tab label without deriving from a prompt (used for new empty tabs). */
+    fun assignTitle(newTitle: String) { title = newTitle }
 
     val isBusy: Boolean get() = turnActive
 
@@ -90,6 +99,12 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         val userMsg = ChatMessage(ChatRole.USER, trimmed)
         messages.add(userMsg)
         notify { it.onMessageAdded(userMsg) }
+
+        if (!titlePinned) {
+            title = deriveTitle(trimmed)
+            titlePinned = true
+            notify { it.onTitleChanged(title) }
+        }
 
         turnActive = true
         currentAssistant = null
@@ -280,19 +295,30 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
         notify { it.onMessageUpdated(msg) }
     }
 
-    // --- PersistentStateComponent ----------------------------------------------
+    // --- persistence (driven by FuguSessionManager) ----------------------------
 
-    override fun getState(): FuguSessionState {
+    fun captureState(): FuguSessionState {
         val state = FuguSessionState()
-        state.threadId = client.threadId
+        state.threadId = clientRef?.threadId ?: pendingThreadId
+        state.title = title
         state.messages = messages.mapTo(mutableListOf()) { it.toPersisted() }
         return state
     }
 
-    override fun loadState(state: FuguSessionState) {
+    fun restoreState(state: FuguSessionState) {
+        title = state.title
+        titlePinned = true
+        pendingThreadId = state.threadId
+        clientRef?.restoreThread(state.threadId)
         messages.clear()
         state.messages.forEach { messages.add(it.toRuntime()) }
-        client.restoreThread(state.threadId)
+    }
+
+    /** First line of the first prompt, trimmed to a tab-sized label. */
+    private fun deriveTitle(prompt: String): String {
+        val firstLine = prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        if (firstLine.isEmpty()) return title
+        return if (firstLine.length <= 24) firstLine else firstLine.take(23).trimEnd() + "…"
     }
 
     private fun refreshProjectFiles() {
@@ -310,7 +336,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
     }
 
     override fun dispose() {
-        client.stop()
+        clientRef?.stop()
         listeners.clear()
     }
 }

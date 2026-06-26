@@ -14,11 +14,6 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
@@ -60,9 +55,12 @@ import javax.swing.Timer
  * The Fugu chat tool-window panel: scrolling transcript on top, a composer with
  * model selector and send/stop controls on the bottom.
  */
-class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposable, FuguSession.Listener {
-
-    private val session = project.getService(FuguSession::class.java)
+class FuguChatPanel(
+    private val project: Project,
+    val session: FuguSession,
+    private val onNewTab: () -> Unit = {},
+    private val onRename: (String) -> Unit = {},
+) : JPanel(BorderLayout()), Disposable, FuguSession.Listener {
 
     private val transcript = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -133,24 +131,42 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun buildToolbar(): JComponent {
-        val group = DefaultActionGroup().apply {
-            add(object : AnAction("New Conversation", "Clear the transcript and start a new Fugu thread", AllIcons.General.Add) {
-                override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun actionPerformed(e: AnActionEvent) = newConversation()
-            })
-            addSeparator()
-            add(object : AnAction("Set up Fugu", "Install Codex, configure the provider, and set the API key", AllIcons.Actions.Download) {
-                override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun actionPerformed(e: AnActionEvent) = openSetup()
-            })
-            add(object : AnAction("Settings", "Open Fugu settings", AllIcons.General.Settings) {
-                override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun actionPerformed(e: AnActionEvent) = openSettings()
-            })
+        // Left: CLEAR (this tab's history) + setup/settings.  Right (opposite the gear):
+        // a "+" that opens a new chat tab.
+        val left = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
+        left.add(textButton("CLEAR", "Clear this conversation and start a fresh Fugu thread") { newConversation() })
+        left.add(iconButton(AllIcons.Actions.Download, "Set up Fugu") { openSetup() })
+        left.add(iconButton(AllIcons.General.Settings, "Settings") { openSettings() })
+
+        val right = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
+        right.add(iconButton(AllIcons.General.Add, "New chat tab") { onNewTab() })
+
+        return JPanel(BorderLayout()).apply {
+            isOpaque = false
+            border = JBUI.Borders.empty(1, 2)
+            add(left, BorderLayout.WEST)
+            add(right, BorderLayout.EAST)
         }
-        val toolbar = ActionManager.getInstance().createActionToolbar("FuguChatToolbar", group, true)
-        toolbar.targetComponent = this
-        return toolbar.component
+    }
+
+    private fun textButton(text: String, tip: String, action: () -> Unit): JButton = JButton(text).apply {
+        toolTipText = tip
+        isFocusPainted = false
+        margin = JBUI.insets(2, 8)
+        font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        addActionListener { action() }
+    }
+
+    private fun iconButton(icon: javax.swing.Icon, tip: String, action: () -> Unit): JButton = JButton(icon).apply {
+        toolTipText = tip
+        isOpaque = false
+        isContentAreaFilled = false
+        isBorderPainted = false
+        isFocusPainted = false
+        border = JBUI.Borders.empty(2, 4)
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        addActionListener { action() }
     }
 
     private fun buildSetupBanner(): EditorNotificationPanel =
@@ -469,6 +485,10 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     override fun onStatus(text: String) {
         statusLabel.text = text
+    }
+
+    override fun onTitleChanged(title: String) {
+        onRename(title)
     }
 
     override fun onUserPrompt(

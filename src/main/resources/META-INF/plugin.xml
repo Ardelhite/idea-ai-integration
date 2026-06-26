@@ -21,8 +21,8 @@
                 id="ai.sanakan.fugu.settings.FuguConfigurable"
                 displayName="Karato"/>
 
-        <!-- Per-project session service -->
-        <projectService serviceImplementation="ai.sanakan.fugu.core.FuguSession"/>
+        <!-- Per-project chat-tab manager (owns and persists all FuguSessions) -->
+        <projectService serviceImplementation="ai.sanakan.fugu.core.FuguSessionManager"/>
 
         <!-- Chat tool window -->
         <toolWindow

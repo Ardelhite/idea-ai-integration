@@ -27,7 +27,13 @@ class PersistedMessage {
 
 class FuguSessionState {
     var threadId: String? = null
+    var title: String = "Chat"
     var messages: MutableList<PersistedMessage> = mutableListOf()
+}
+
+/** Persisted set of chat tabs for a project (workspace-scoped). */
+class FuguManagerState {
+    var sessions: MutableList<FuguSessionState> = mutableListOf()
 }
 
 // --- mapping between runtime and persisted models ------------------------------
