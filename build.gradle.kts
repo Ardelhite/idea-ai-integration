@@ -87,6 +87,7 @@ tasks {
         // When both are requested ("Clear sample project" run config), clear first.
         mustRunAfter(clearSandbox)
         val sampleDir = layout.buildDirectory.dir("sandbox-project")
+        val configDir = layout.buildDirectory.dir("idea-sandbox/$sandboxName/config")
         doFirst {
             val dir = sampleDir.get().asFile
             dir.mkdirs()
@@ -94,6 +95,15 @@ tasks {
                 "# Karato sandbox\n\nA throwaway project for testing the Karato plugin.\n",
             )
             File(dir, "hello.txt").writeText("edit me\n")
+
+            // The bundled Gradle plugin's JVM-support matrix crashes parsing JDK 25 on
+            // 2024.2.x (GradleJvmSupportMatrix → JavaVersion.parse("25")). Karato doesn't
+            // need Gradle in the sandbox, so disable that plugin to silence the noise.
+            val cfg = configDir.get().asFile.also { it.mkdirs() }
+            val disabled = File(cfg, "disabled_plugins.txt")
+            val ids = (if (disabled.isFile) disabled.readLines() else emptyList()).map { it.trim() }
+                .filter { it.isNotEmpty() }.toMutableSet()
+            if (ids.add("org.jetbrains.plugins.gradle")) disabled.writeText(ids.joinToString("\n") + "\n")
         }
         argumentProviders.add(
             CommandLineArgumentProvider { listOf(sampleDir.get().asFile.absolutePath) },
