@@ -287,7 +287,7 @@ class MessageComponent(
 
     private fun roleLabel(role: ChatRole) = when (role) {
         ChatRole.USER -> "You"
-        ChatRole.ASSISTANT -> "Fugu"
+        ChatRole.ASSISTANT -> message.model ?: "Fugu"
         ChatRole.SYSTEM -> "System"
         ChatRole.ERROR -> "Error"
     }
@@ -300,10 +300,12 @@ class MessageComponent(
     }
 
     private fun backgroundFor(role: ChatRole) = when (role) {
-        ChatRole.USER -> UIUtil.getPanelBackground()
         ChatRole.ERROR -> JBColor(0xFDECEC, 0x4A2C2C)
-        else -> UIUtil.getListBackground()
+        else -> editorBackground()
     }
+
+    private fun editorBackground() =
+        com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().globalScheme.defaultBackground
 
     // --- visual helpers --------------------------------------------------------
 

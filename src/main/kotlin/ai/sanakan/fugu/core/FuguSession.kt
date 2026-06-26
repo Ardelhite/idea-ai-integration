@@ -236,7 +236,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener,
 
     private fun ensureAssistant(): ChatMessage {
         currentAssistant?.let { return it }
-        val msg = ChatMessage(ChatRole.ASSISTANT).apply { streaming = true }
+        val msg = ChatMessage(ChatRole.ASSISTANT).apply { streaming = true; model = this@FuguSession.model }
         currentAssistant = msg
         messages.add(msg)
         notify { it.onMessageAdded(msg) }

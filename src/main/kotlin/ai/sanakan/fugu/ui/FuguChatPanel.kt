@@ -4,6 +4,8 @@ import ai.sanakan.fugu.core.ChatMessage
 import ai.sanakan.fugu.core.FuguSession
 import ai.sanakan.fugu.core.FuguSetup
 import ai.sanakan.fugu.core.ProjectFiles
+import ai.sanakan.fugu.core.SakanaApi
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
@@ -63,7 +65,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     private val transcript = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        background = UIUtil.getListBackground()
+        background = editorBackground()
     }
     private val scrollPane = JBScrollPane(
         wrapTop(transcript),
@@ -77,6 +79,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         rows = 6
         emptyText.text = "Ask Fugu… (⏎ to send, ⇧⏎ newline, @ to reference a file)"
         border = JBUI.Borders.empty(6)
+        background = editorBackground()
     }
     private val fileBar = FileReferenceBar { revalidate() }
     private var inputHeight = JBUI.scale(144)
@@ -118,6 +121,7 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
         session.messages.forEach { addMessageComponent(it) }
         updateBusyState(session.isBusy)
         refreshSetupBanner()
+        loadModels()
     }
 
     private fun buildToolbar(): JComponent {
@@ -180,9 +184,26 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     private fun wrapTop(inner: JComponent): JComponent {
         // Keeps messages anchored to the top of the viewport.
-        val wrapper = JPanel(BorderLayout()).apply { background = UIUtil.getListBackground() }
+        val wrapper = JPanel(BorderLayout()).apply { background = editorBackground() }
         wrapper.add(inner, BorderLayout.NORTH)
         return wrapper
+    }
+
+    private fun editorBackground() = EditorColorsManager.getInstance().globalScheme.defaultBackground
+
+    /** Fetches the account's available models from Sakana and fills the model dropdown. */
+    private fun loadModels() {
+        val key = FuguSecrets.getApiKey() ?: return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val models = SakanaApi.listModels(key).getOrNull()
+                ?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater({
+                if (project.isDisposed) return@invokeLater
+                val current = (modelCombo.editor.item as? String)?.takeIf { it.isNotBlank() } ?: session.model
+                modelCombo.model = DefaultComboBoxModel(models.toTypedArray())
+                modelCombo.selectedItem = if (current in models) current else session.model
+            }, ModalityState.any())
+        }
     }
 
     private fun buildComposer(): JComponent {

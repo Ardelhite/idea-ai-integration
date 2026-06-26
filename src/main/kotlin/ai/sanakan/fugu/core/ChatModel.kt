@@ -41,6 +41,9 @@ class ChatMessage(
     val text = StringBuilder(initialText)
     val toolCalls = mutableListOf<ToolCall>()
 
+    /** Model that produced an assistant message (shown as its header). */
+    var model: String? = null
+
     /** True while the assistant turn is still streaming. */
     var streaming: Boolean = false
 

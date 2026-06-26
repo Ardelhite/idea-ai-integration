@@ -21,6 +21,7 @@ class PersistedTool {
 class PersistedMessage {
     var role: String = ChatRole.ASSISTANT.name
     var text: String = ""
+    var model: String? = null
     var tools: MutableList<PersistedTool> = mutableListOf()
 }
 
@@ -34,6 +35,7 @@ class FuguSessionState {
 internal fun ChatMessage.toPersisted(): PersistedMessage = PersistedMessage().also { p ->
     p.role = role.name
     p.text = text.toString()
+    p.model = model
     p.tools = toolCalls.mapTo(mutableListOf()) { call ->
         PersistedTool().also {
             it.name = call.name
@@ -46,7 +48,7 @@ internal fun ChatMessage.toPersisted(): PersistedMessage = PersistedMessage().al
 
 internal fun PersistedMessage.toRuntime(): ChatMessage {
     val runtimeRole = runCatching { ChatRole.valueOf(role) }.getOrDefault(ChatRole.ASSISTANT)
-    val msg = ChatMessage(runtimeRole, text)
+    val msg = ChatMessage(runtimeRole, text).apply { model = this@toRuntime.model }
     tools.forEach { t ->
         msg.toolCalls.add(ToolCall(id = t.name + "@" + (t.target ?: ""), name = t.name, input = inputFor(t.name, t.target), result = t.result, isError = t.isError))
     }
