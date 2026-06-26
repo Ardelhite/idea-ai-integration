@@ -199,7 +199,14 @@ class FuguChatPanel(
         isContentAreaFilled = false
         isBorderPainted = false
         isFocusPainted = false
+        margin = JBUI.emptyInsets()
         border = JBUI.Borders.empty(2, 4)
+        // Pin to the icon's size so the platform L&F doesn't pad it wide (which would
+        // break the tight left/right grouping in the header).
+        val d = Dimension(icon.iconWidth + JBUI.scale(8), icon.iconHeight + JBUI.scale(8))
+        preferredSize = d
+        minimumSize = d
+        maximumSize = d
         cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
         addActionListener { action() }
     }

@@ -28,6 +28,7 @@
         <toolWindow
                 id="Karato"
                 anchor="right"
+                canCloseContents="true"
                 icon="/icons/karatoToolwindow.png"
                 factoryClass="ai.sanakan.fugu.ui.FuguToolWindowFactory"/>
 
