@@ -85,13 +85,25 @@ class MessageComponent(
     init {
         isOpaque = true
         background = backgroundFor(message.role)
-        border = JBUI.Borders.compound(
-            JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0),
-            JBUI.Borders.empty(8, 10),
-        )
+        val isUser = message.role == ChatRole.USER
+        // User input: no "You" header, framed in a light-blue (水色) box instead.
+        border = if (isUser) {
+            JBUI.Borders.compound(
+                JBUI.Borders.empty(4, 4),
+                JBUI.Borders.compound(
+                    JBUI.Borders.customLine(userFrameColor, 1),
+                    JBUI.Borders.empty(6, 8),
+                ),
+            )
+        } else {
+            JBUI.Borders.compound(
+                JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0),
+                JBUI.Borders.empty(8, 10),
+            )
+        }
         alignmentX = Component.LEFT_ALIGNMENT
 
-        add(header(), BorderLayout.NORTH)
+        if (!isUser) add(header(), BorderLayout.NORTH)
         val center = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
@@ -101,6 +113,8 @@ class MessageComponent(
         add(center, BorderLayout.CENTER)
         refresh()
     }
+
+    private val userFrameColor get() = JBColor(0x5BA3D9, 0x5A9BD4)
 
     override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
 
