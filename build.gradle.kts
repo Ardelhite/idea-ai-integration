@@ -97,13 +97,15 @@ tasks {
             File(dir, "hello.txt").writeText("edit me\n")
 
             // The bundled Gradle plugin's JVM-support matrix crashes parsing JDK 25 on
-            // 2024.2.x (GradleJvmSupportMatrix → JavaVersion.parse("25")). Karato doesn't
-            // need Gradle in the sandbox, so disable that plugin to silence the noise.
+            // 2024.2.x (GradleJvmSupportMatrix → JavaVersion.parse("25"), owned by plugin
+            // com.intellij.gradle). Karato doesn't need Gradle in the sandbox, so disable
+            // it (and its dependents) to silence the noise.
             val cfg = configDir.get().asFile.also { it.mkdirs() }
             val disabled = File(cfg, "disabled_plugins.txt")
+            val want = listOf("com.intellij.gradle", "org.jetbrains.plugins.gradle")
             val ids = (if (disabled.isFile) disabled.readLines() else emptyList()).map { it.trim() }
                 .filter { it.isNotEmpty() }.toMutableSet()
-            if (ids.add("org.jetbrains.plugins.gradle")) disabled.writeText(ids.joinToString("\n") + "\n")
+            if (ids.addAll(want)) disabled.writeText(ids.joinToString("\n") + "\n")
         }
         argumentProviders.add(
             CommandLineArgumentProvider { listOf(sampleDir.get().asFile.absolutePath) },
