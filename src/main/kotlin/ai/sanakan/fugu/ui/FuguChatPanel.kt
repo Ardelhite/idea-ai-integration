@@ -52,7 +52,6 @@ import javax.swing.DefaultComboBoxModel
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.KeyStroke
 import javax.swing.ScrollPaneConstants
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -317,21 +316,26 @@ class FuguChatPanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private val sendModifierMask = if (SystemInfo.isMac) KeyEvent.META_DOWN_MASK else KeyEvent.ALT_DOWN_MASK
 
     private fun wireActions() {
-        // Both keystrokes are always bound; the active send shortcut is read live, so
-        // changing it in Settings takes effect immediately without reopening the panel.
-        //  - plain Enter:      sends in ENTER mode, inserts a newline in MODIFIER mode
-        //  - ⌘/Alt + Enter:    always sends (and inserts a newline in ENTER mode would
-        //                      be confusing, so it stays a send shortcut there too)
-        input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "fugu-enter")
-        input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, sendModifierMask), "fugu-modifier-enter")
-        input.actionMap.put("fugu-enter", object : javax.swing.AbstractAction() {
-            override fun actionPerformed(e: java.awt.event.ActionEvent) {
-                if (FuguSettings.getInstance().sendShortcutEnum == SendShortcut.ENTER) onSendOrStop()
-                else input.replaceSelection("\n")
+        // Enter handling depends on the configured send shortcut, read live so a change
+        // in Settings applies immediately. A *consuming* key listener runs before Swing's
+        // own Enter binding (insert-break / our action map), so it fully owns the keystroke
+        // and there is no double-handling:
+        //   ENTER mode:    Enter sends      · ⇧Enter and ⌘/Alt+Enter behave as below
+        //   MODIFIER mode: ⌘/Alt+Enter sends · plain Enter inserts a newline
+        // In every mode ⇧Enter inserts a newline and ⌘/Alt+Enter sends.
+        input.addKeyListener(object : java.awt.event.KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if (e.keyCode != KeyEvent.VK_ENTER) return
+                val withSendModifier = (e.modifiersEx and sendModifierMask) != 0
+                val shift = (e.modifiersEx and KeyEvent.SHIFT_DOWN_MASK) != 0
+                val send = when {
+                    shift -> false
+                    withSendModifier -> true
+                    else -> FuguSettings.getInstance().sendShortcutEnum == SendShortcut.ENTER
+                }
+                e.consume()
+                if (send) onSendOrStop() else input.replaceSelection("\n")
             }
-        })
-        input.actionMap.put("fugu-modifier-enter", object : javax.swing.AbstractAction() {
-            override fun actionPerformed(e: java.awt.event.ActionEvent) = onSendOrStop()
         })
 
         // "@" opens a project-file picker; the chosen file becomes a reference chip.
