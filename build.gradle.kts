@@ -42,8 +42,10 @@ dependencies {
         exclude(group = "org.jetbrains.kotlin")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
     }
-    // JetBrains' Markdown parser (pure Kotlin) for rendering chat messages.
-    implementation("org.jetbrains:markdown:0.7.3") {
+    // JetBrains' Markdown parser (org.intellij.markdown) for rendering chat messages.
+    // The IDE already bundles this package, so compile against it but DON'T ship a copy
+    // (bundling an IDE package trips a Plugin Verifier warning); the IDE provides it at runtime.
+    compileOnly("org.jetbrains:markdown:0.7.3") {
         exclude(group = "org.jetbrains.kotlin")
     }
 
@@ -98,9 +100,13 @@ intellijPlatform {
     }
 
     // `./gradlew verifyPlugin` checks binary compatibility against target IDEs.
+    // `recommended()` pulls the newest IDEs, which don't resolve here (macOS aarch64
+    // ships .dmg-only builds and the latest coordinate may be unavailable), so verify
+    // against the build target. JetBrains re-runs the full-range verifier during the
+    // Marketplace review.
     pluginVerification {
         ides {
-            recommended()
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, providers.gradleProperty("platformVersion").get())
         }
     }
 }

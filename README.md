@@ -1,192 +1,182 @@
 # Karato — Agent for Sakana AI fugu
 
-**Karato** is an IntelliJ Platform plugin that integrates **Sakana AI Fugu** (and
-**fugu-ultra**) into the IDE. Fugu has no standalone binary — it is a multi-agent system exposed
-through an OpenAI-compatible API and used for coding via the **Codex CLI** with
-the Sakana provider. This plugin drives Codex as a subprocess, shows the
-conversation in a tool window, renders each command/file-change item as a card,
-and reflects edits back into the IDE.
+<!-- After the plugin is approved, replace 00000 with the numeric Marketplace ID
+     (shown in the plugin page URL) so these badges render. -->
+[![JetBrains Marketplace Version](https://img.shields.io/jetbrains/plugin/v/00000.svg?label=Marketplace)](https://plugins.jetbrains.com/plugin/00000)
+[![JetBrains Marketplace Downloads](https://img.shields.io/jetbrains/plugin/d/00000.svg)](https://plugins.jetbrains.com/plugin/00000)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![IntelliJ Platform](https://img.shields.io/badge/IntelliJ%20Platform-2024.2%2B-orange.svg)](https://plugins.jetbrains.com/docs/intellij/)
 
-Two transports are selectable:
-- **`codex app-server`** (default) — a long-lived JSON-RPC service supporting
-  **interactive approvals** (approve/decline before each edit or command).
-- **`codex exec --json`** — headless, one process per turn, no approvals.
+**Karato** brings the **Sakana AI Fugu** coding agent (and **fugu-ultra**) into JetBrains IDEs
+as a multi-tab chat tool window. It drives the OpenAI **Codex CLI** — configured with Sakana's
+Fugu provider — as a subprocess and renders its streamed events live: chat with the agent, watch
+it run commands and edit files in your project, approve actions inline, and review changes as they
+happen.
 
-The design follows open-source Claude-Code GUIs (wrap the agent CLI, stream its
-events, render a chat surface) — adapted to Codex's `thread/turn/item` protocol.
+> Fugu has no standalone binary — it's a multi-agent system reached through an OpenAI-compatible
+> API and used for coding via Codex with the Sakana provider. Karato wraps that for you, end to end,
+> from the IDE — **no terminal required**.
 
-## Architecture
+## Screenshots
 
-```
-┌──────────────────────────────────────────────┐
-│  ui/                                            │
-│   FuguToolWindowFactory → FuguChatPanel         │  Swing transcript + composer
-│   MessageComponent (bubbles, tool cards)        │
-└───────────────┬─────────────────────────────────┘
-                │ FuguAgentListener (EDT) — incl. onApproval
-┌───────────────▼─────────────────────────────────┐
-│  core/                                           │
-│   FuguSession  (@Service, persisted per project) │  state, dispatch, approval UI
-│   ChatMessage / ToolCall                         │
-└───────────────┬─────────────────────────────────┘
-                │ FuguTransport
-┌───────────────▼─────────────────────────────────┐
-│  cli/                                            │
-│   FuguAppServerClient  (JSON-RPC, approvals)     │  initialize→thread→turn
-│   FuguCliClient        (one `codex exec` /turn)  │  spawn + JSONL pump + resume
-│   FuguEvent / parsers                            │
-└───────────────┬─────────────────────────────────┘
-                │ GeneralCommandLine
-        ┌───────▼────────────────────────────────┐
-        │ codex app-server | codex exec  (Sakana → Fugu) │
-        └─────────────────────────────────────────┘
-
-  settings/  FuguSettings (persisted) + FuguConfigurable (Tools → Karato)
-```
-
-### Protocol
-
-The **app-server** transport (default) keeps one process and speaks JSON-RPC:
-`initialize → initialized → thread/start|thread/resume → turn/start`, with
-`item/*` and `turn/*` notifications and `item/.../requestApproval` requests — see
-[Approvals](#configuration--settings--tools--sanakan-ai-fugu) below.
-
-The **exec** transport spawns one process per turn; the first turn starts a
-thread, later turns resume it via the captured `thread_id`:
-
-```bash
-# first turn
-codex exec --json -m fugu -c model_provider=sakana \
-     --sandbox workspace-write -a never --skip-git-repo-check "<prompt>"
-
-# subsequent turns
-codex exec resume <thread_id> --json -m fugu … "<follow-up>"
-```
-
-`stdout` is JSON Lines. The parser normalizes Codex's experimental schema into a
-small `FuguEvent` set (lenient — unknown fields/versions degrade gracefully):
-
-| Codex event | → FuguEvent |
+<!-- Add images under docs/img/ and they'll render here. -->
+| Chat & inline tool cards | MCP servers (Playwright) |
 |---|---|
-| `thread.started` (`thread_id`) | `Init` (captured for `resume`) |
-| `item.completed` `item_type=agent_message` | `AgentMessage` |
-| `item.started` / `item.completed` `command_execution` / `file_change` / `mcp_tool_call` / `web_search` / `todo_list` | `ToolStarted` / `ToolCompleted` |
-| `turn.completed` (`usage`) | `Result` (success) |
-| `turn.failed` / `error` | `Result` (error) |
+| ![Chat with inline tool cards](docs/img/chat.png) | ![Using an MCP server](docs/img/mcp.png) |
 
-## Setup — no terminal required
+| GUI-only setup | Per-tab sessions |
+|---|---|
+| ![Set up Fugu dialog](docs/img/setup.png) | ![Multiple chat tabs](docs/img/tabs.png) |
 
-Open the **Karato** tool window and click **Set up Fugu** (also on the toolbar, and
-in the warning banner shown until setup is complete). The dialog does everything
-that used to require shell commands:
+## Features
 
-1. **Sakana API key** — paste a key (from `console.sakana.ai/api-keys`, linked in
-   the dialog) and click **Verify**; it pings `GET /v1/models`. The key is stored
-   in PasswordSafe and injected into every Codex process as `SAKANA_API_KEY` — so
-   no `export` is needed, and it's never written to disk in cleartext.
-2. **Codex CLI** — **Install Codex CLI** runs the Fugu installer (with the key
-   already in the environment) and streams the log into the dialog.
-3. **Sakana provider** — **Write provider config** appends the
-   `[model_providers.sakana]` block to `$CODEX_HOME/config.toml` (default
-   `~/.codex/config.toml`), idempotently and preserving your existing config — so
-   you never hand-edit TOML.
+- **Multi-tab chat** — each tab is an independent conversation (own transcript + Codex thread);
+  open with **+**, close with the tab's **×** (ends the session and discards its log). A spinner
+  by the tab number shows which tab is working.
+- **Inline tool cards** — run-command / web-search / file-edit / MCP-tool items appear at the point
+  they happen in the response, not piled at the bottom. File-change cards open the file on click.
+- **Interactive approvals** — with the app-server transport you approve / decline edits and commands
+  inline before they run.
+- **GUI-only setup** — install Codex, write the provider config, and store your API key from a dialog;
+  no shell commands.
+- **Reads your Claude/Codex project files** — `CLAUDE.md`, `.claude/`, and project memory are sent to
+  the agent automatically so you don't paste them every turn (Codex reads its own `AGENTS.md` natively).
+- **MCP server mirroring** — reuses the MCP servers you already configured for Claude Code (e.g.
+  **Playwright**) by mirroring them into Codex, with an **Off / Project / All** scope dropdown.
+- **Configurable send shortcut** — `Enter` or `⌘/Alt + Enter` to send, with a hint under the button.
+- **Persistent** — tabs, transcripts and Codex threads survive IDE restarts.
 
-The chat composer stays usable, but the banner reminds you which of the three
-pieces are still missing until `FuguSetup.isReady()`.
+## Install
 
-### Requirements
+**From the JetBrains Marketplace** (recommended, once approved):
+Settings → **Plugins** → **Marketplace** → search **“Karato”** → **Install**.
 
-- JDK 21 (Gradle toolchain; this machine: `/opt/homebrew/opt/openjdk@21`)
-- macOS/Linux (the Codex installer supports these; on Windows, install Codex
-  separately and use **Write provider config** + the API key field)
+**From disk:**
+1. Download `Karato-<version>.zip` (or build it — see below).
+2. Settings → **Plugins** → ⚙ → **Install Plugin from Disk…** → pick the ZIP → restart.
 
-> Equivalent manual commands, if you prefer the terminal: `export SAKANA_API_KEY=…`,
-> `curl -fsSL https://sakana.ai/fugu/install | bash`. See
-> <https://console.sakana.ai/get-started>.
-
-## Build & run
-
+**Build it yourself:**
 ```bash
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21
-
-./gradlew buildPlugin     # → build/distributions/fugu-intellij-0.1.0.zip
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # JDK 21 is required
+./gradlew buildPlugin     # → build/distributions/*.zip
 ./gradlew runIde          # launches a sandbox IDE with the plugin loaded
 ```
 
 Open the **Karato** tool window on the right and start chatting.
 
-### Configuration — Settings → Tools → Karato
+## Setup — no terminal required
+
+Open the **Karato** tool window and click **Set up Fugu** (also in the warning banner shown until
+setup is complete). The dialog does everything that used to require shell commands:
+
+1. **Sakana API key** — paste a key (from `console.sakana.ai/api-keys`, linked in the dialog) and
+   click **Verify**; it pings `GET /v1/models`. The key is stored in **PasswordSafe** and injected
+   into every Codex process as `SAKANA_API_KEY` — never written to disk in cleartext.
+2. **Codex CLI** — **Install Codex CLI** runs the Fugu installer (with the key already in the
+   environment) and streams the log into the dialog.
+3. **Sakana provider** — **Write provider config** appends the `[model_providers.sakana]` block to
+   `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`), idempotently and preserving your
+   existing config.
+
+### Requirements
+
+- A **Sakana account / API key** and network access.
+- **JDK 21** to build (the Gradle toolchain pins it).
+- macOS/Linux for the one-click Codex installer; on Windows, install Codex separately and use
+  **Write provider config** + the API key field.
+
+## Using MCP servers (e.g. Playwright)
+
+Karato mirrors the MCP servers you configured for Claude Code into Codex, so they work here too.
+The **MCP** dropdown in the header (left of **+**) sets the scope, applied immediately:
+
+| Scope | Servers used |
+|---|---|
+| **Off** | none |
+| **Project** | this project's servers — `<project>/.mcp.json` + `~/.claude.json` project-local |
+| **All** | the above **plus** user-global servers (`~/.claude.json` `mcpServers`) |
+
+The selected servers are written into `~/.codex/config.toml` (in a managed region that preserves your
+hand-written entries) and each tab's Codex process reloads to pick them up. Servers added directly to
+Codex (`codex mcp add …`) keep working regardless of the dropdown.
+
+> Note: Claude’s **claude.ai connectors** (OAuth-based, e.g. Gmail/Drive) can't be mirrored to Codex.
+> Use local/stdio servers — e.g. add `{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest"]}}}`
+> to your project's `.mcp.json`.
+
+## Configuration — Settings → Tools → Karato
 
 | Setting | Default | Notes |
 |---|---|---|
+| Transport | codex app-server | `app-server` (interactive approvals) or `exec` (headless) |
 | Codex CLI path | `codex` | or `codex-fugu`, or an absolute path |
-| Model | `fugu` | `fugu` / `fugu-ultra` (editable) → `-m` |
-| Transport | codex app-server | `app-server` (approvals) or `exec` (headless) |
+| Model | `fugu` | `fugu` / `fugu-ultra` (also fetched live from your account) |
 | Permission mode | Ask before each edit/command | sandbox + approval policy (see below) |
+| Send shortcut | Enter to send | or `⌘/Alt + Enter` (Enter inserts a newline) |
+| Load Claude/Codex project files | on | inject `CLAUDE.md` / `.claude/` / memory at thread start |
 | Sakana provider override | on | adds `-c model_provider=sakana` (turn **off** for `codex-fugu`) |
-| Sakana API key | — | stored in PasswordSafe, injected into Codex as `SAKANA_API_KEY` |
+| Sakana API key | — | stored in PasswordSafe, injected as `SAKANA_API_KEY` |
 | Extra CLI args | — | appended verbatim |
+
+The header also has a **CLEAR** button (clears the current tab and starts a fresh Codex thread) and the
+**MCP** scope dropdown described above.
 
 Permission modes (sandbox + approval policy):
 
 | Mode | sandbox | approval | notes |
 |---|---|---|---|
-| Ask before each edit/command | workspace-write | on-request | **app-server only** — prompts via a dialog; `exec` clamps to never |
+| Ask before each edit/command | workspace-write | on-request | **app-server only** — prompts inline; `exec` clamps to never |
 | Read-only (plan) | read-only | never | no edits |
 | Auto-edit workspace | workspace-write | never | edits without prompting |
 | Full access | danger-full-access | never | bypasses the sandbox |
 
-**Approvals.** With the app-server transport + "Ask" mode, the server sends
-`item/fileChange/requestApproval` / `item/commandExecution/requestApproval`
-before acting; the plugin shows an **Approve / Approve for session / Decline**
-dialog and replies `{ "decision": … }`. (Enum casing for `approvalPolicy` /
-`sandbox` is version-sensitive across Codex builds — kebab-case here follows the
-`main` source; pin with `codex app-server generate-json-schema` if a turn fails
-to start.)
+## Data & privacy
+
+Karato is a client for your own accounts and tools. To function it: sends your prompts and the selected
+project context to the **Sakana AI API** via the Codex CLI; runs the **Codex CLI** and, when MCP is
+enabled, MCP servers (e.g. via `npx`) as subprocesses; reads the Claude/Codex configuration files listed
+above; and writes MCP entries to `~/.codex/config.toml`. Your API key lives in the IDE’s PasswordSafe and
+is passed to Codex via an environment variable. **Karato collects no telemetry and sends nothing to the
+author.**
+
+## Architecture
+
+```
+ui/ (Swing, EDT) ──Listener──> core/FuguSession ──FuguTransport──> cli/ ──GeneralCommandLine──> codex
+                                      ▲
+                        owned/persisted by FuguSessionManager (one tab each)
+```
+
+- **`cli/FuguTransport`** — the seam swapped by the `transportKind` setting:
+  `FuguAppServerClient` (long-lived `codex app-server` JSON-RPC, interactive approvals) and
+  `FuguCliClient` (`codex exec --json`, one process per turn). Both normalize their different wire
+  formats into the shared `FuguEvent` set.
+- **`core/FuguSessionManager`** (`@Service`, persisted to the workspace file) owns the ordered list of
+  chat tabs; the tool window mirrors it as content tabs.
+- **`core/FuguSession`** — one tab: transcript, turn dispatch, approval/prompt callbacks, and its own
+  Codex `thread_id` for resume. The transport is created lazily on first send.
+- **`core/AgentContext`** / **`core/McpConfig`** — gather Claude/Codex project files and mirror MCP
+  servers, respectively.
+
+### Protocol
+
+The **app-server** transport keeps one process and speaks JSON-RPC:
+`initialize → initialized → thread/start|thread/resume → turn/start`, with `item/*` and `turn/*`
+notifications and `item/.../requestApproval` requests. The **exec** transport spawns one process per
+turn and resumes via the captured `thread_id`. `stdout` is JSON Lines, parsed leniently into a small
+`FuguEvent` set (unknown fields/versions degrade gracefully).
 
 ## Trying it without the real CLI
 
-Two mocks ship in `tools/`, both off-by-default for the Sakana provider:
+Two mocks ship in `tools/`:
+- `tools/mock-codex-appserver` — the **app-server JSON-RPC** protocol incl. the **approval flow**
+  (Transport = `app-server`).
+- `tools/mock-fugu` — the **`codex exec --json`** protocol (Transport = `exec`).
 
-- `tools/mock-codex-appserver` — speaks the **app-server JSON-RPC** protocol and
-  exercises the **approval flow** (asks to apply a README.md change, then applies
-  or skips based on your decision). Use with Transport = `app-server`.
-- `tools/mock-fugu` — speaks the **`codex exec --json`** protocol. Use with
-  Transport = `exec`.
+Point **Codex CLI path** at the matching mock and turn the Sakana override **off**.
 
-Point **Codex CLI path** at the matching mock and turn the Sakana override off:
+## License
 
-```
-Transport:        codex app-server
-Codex CLI path:   <repo>/tools/mock-codex-appserver
-Sakana provider:  ☐
-```
-
-## A note on auth
-
-Sakana's console supports Google SSO, but there is **no API to auto-fetch a key
-or account usage** — keys are created manually in the console (the Setup dialog
-deep-links there) and pasted once; the plugin stores them in PasswordSafe. The
-only usage signal available is the per-request token `usage` Codex reports, which
-the plugin tallies and shows in the status bar after each turn.
-
-## Persistence
-
-The transcript and the Codex `thread_id` are saved per project (workspace file),
-so the conversation survives tool-window reopens and IDE restarts; the next turn
-resumes the same Codex thread. **New Conversation** clears it and starts fresh.
-
-## Status
-
-Implemented: chat, file editing, setup/install, persistence, per-request usage,
-secure API key, and **interactive approvals** via the app-server transport
-(approve/decline before each edit or command). File-change cards open the
-affected file on click; the VFS is refreshed after edits.
-
-**Caveat.** The app-server protocol is experimental and version-sensitive; this
-client follows the `main`-branch schema and has been validated against the
-included `tools/mock-codex-appserver`, but not yet against a specific live Codex
-build. If a turn fails to start, switch Transport to `exec`, or pin the schema
-with `codex app-server generate-json-schema`. Next candidates: streaming agent
-deltas, richer diff preview in the approval dialog, and `acceptForSession`
-memory so a session-approved tool isn't re-prompted.
+[Apache License 2.0](LICENSE). “Sakana AI”, “Fugu”, and “Codex” are names of their respective owners,
+used only to describe the services this plugin integrates with; this project is not affiliated with or
+endorsed by them.
