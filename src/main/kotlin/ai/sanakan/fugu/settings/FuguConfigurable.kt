@@ -53,6 +53,8 @@ class FuguConfigurable : Configurable {
         JBCheckBox("Load Claude/Codex project files (CLAUDE.md, .claude/, project memory)")
     private val allowNetworkCheck =
         JBCheckBox("Allow network in workspace-write sandbox (gh, curl, npm, …)")
+    private val allowGitWritesCheck =
+        JBCheckBox("Allow git writes (.git) in workspace-write sandbox (commits, gh)")
     private val apiKeyField = JBPasswordField().apply { columns = 30 }
     private val apiKeyLink = HyperlinkLabel("Create an API key at console.sakana.ai").apply {
         addHyperlinkListener { BrowserUtil.browse(FuguSecrets.CONSOLE_KEYS_URL) }
@@ -74,6 +76,7 @@ class FuguConfigurable : Configurable {
             .addComponent(sakanaProviderCheck)
             .addComponent(loadAgentContextCheck)
             .addComponent(allowNetworkCheck)
+            .addComponent(allowGitWritesCheck)
             .addLabeledComponent("Sakana API key:", apiKeyField, true)
             .addComponentToRightColumn(apiKeyLink)
             .addLabeledComponent("Extra CLI args:", extraArgsField, true)
@@ -94,6 +97,7 @@ class FuguConfigurable : Configurable {
             sakanaProviderCheck.isSelected != s.sakanaProvider ||
             loadAgentContextCheck.isSelected != s.loadAgentContext ||
             allowNetworkCheck.isSelected != s.allowNetwork ||
+            allowGitWritesCheck.isSelected != s.allowGitWrites ||
             String(apiKeyField.password) != loadedKey ||
             extraArgsField.text != s.extraArgs
     }
@@ -108,6 +112,7 @@ class FuguConfigurable : Configurable {
         s.sakanaProvider = sakanaProviderCheck.isSelected
         s.loadAgentContext = loadAgentContextCheck.isSelected
         s.allowNetwork = allowNetworkCheck.isSelected
+        s.allowGitWrites = allowGitWritesCheck.isSelected
         s.extraArgs = extraArgsField.text.trim()
 
         val key = String(apiKeyField.password)
@@ -128,6 +133,7 @@ class FuguConfigurable : Configurable {
         sakanaProviderCheck.isSelected = s.sakanaProvider
         loadAgentContextCheck.isSelected = s.loadAgentContext
         allowNetworkCheck.isSelected = s.allowNetwork
+        allowGitWritesCheck.isSelected = s.allowGitWrites
         extraArgsField.text = s.extraArgs
 
         // PasswordSafe can touch the native keychain — never read it on the EDT.

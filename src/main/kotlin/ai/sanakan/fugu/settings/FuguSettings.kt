@@ -109,6 +109,13 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
      */
     var allowNetwork: Boolean = true
 
+    /**
+     * Let git/gh write inside the project's `.git` (commits, refs, locks). Codex protects
+     * `<workspace>/.git` as read-only in `workspace-write` by default; when on, the launch
+     * adds the repo's `.git` to `sandbox_workspace_write.writable_roots`.
+     */
+    var allowGitWrites: Boolean = true
+
     /** Which Claude-mirrored MCP servers Codex should launch, stored by enum name. */
     var mcpMode: String = McpMode.ALL.name
 

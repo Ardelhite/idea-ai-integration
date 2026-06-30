@@ -68,6 +68,11 @@ class FuguCliClient(
                 if (settings.allowNetwork && mode.sandbox == "workspace-write") {
                     addParameters("-c", "sandbox_workspace_write.network_access=true")
                 }
+                // Codex protects <workspace>/.git as read-only in workspace-write; add it back
+                // to writable_roots so git/gh can write refs/locks/commits.
+                if (settings.allowGitWrites && mode.sandbox == "workspace-write") {
+                    addParameters("-c", "sandbox_workspace_write.writable_roots=[${tomlPath("$workingDir/.git")}]")
+                }
                 // exec is headless: `on-request` would be auto-declined, so clamp to never.
                 addParameters("-a", if (mode.approval == "on-request") "never" else mode.approval)
             }

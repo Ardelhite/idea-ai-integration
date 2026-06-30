@@ -115,6 +115,7 @@ Codex (`codex mcp add …`) keep working regardless of the dropdown.
 | Send shortcut | Enter to send | or `⌘/Alt + Enter` (Enter inserts a newline) |
 | Load Claude/Codex project files | on | inject `CLAUDE.md` / `.claude/` / memory at thread start |
 | Allow network in sandbox | on | adds `-c sandbox_workspace_write.network_access=true` so `gh`/`curl`/`npm` work |
+| Allow git writes (.git) | on | adds the repo's `.git` to `writable_roots` (Codex makes it read-only by default), so commits/`gh` work |
 | Sakana provider override | on | adds `-c model_provider=sakana` (turn **off** for `codex-fugu`) |
 | Sakana API key | — | stored in PasswordSafe, injected as `SAKANA_API_KEY` |
 | Extra CLI args | — | appended verbatim |

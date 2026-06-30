@@ -116,6 +116,11 @@ class FuguAppServerClient(
             if (settings.allowNetwork) {
                 addParameters("-c", "sandbox_workspace_write.network_access=true")
             }
+            // Codex protects <workspace>/.git as read-only in workspace-write; add it back to
+            // writable_roots so git/gh can write (commits, refs, locks).
+            if (settings.allowGitWrites) {
+                addParameters("-c", "sandbox_workspace_write.writable_roots=[${tomlPath("$workingDir/.git")}]")
+            }
             setWorkDirectory(workingDir)
             charset = StandardCharsets.UTF_8
             withEnvironment(FuguEnv.codexEnvironment())

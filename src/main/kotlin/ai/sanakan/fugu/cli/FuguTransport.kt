@@ -100,3 +100,7 @@ interface FuguAgentListener {
         respond(PromptAction.DECLINE, emptyMap())
     }
 }
+
+/** Quotes a filesystem path as a TOML basic string for a Codex `-c key=value` override. */
+internal fun tomlPath(path: String): String =
+    "\"" + path.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
