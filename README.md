@@ -1,4 +1,4 @@
-# Karato — Agent for Sakana AI fugu
+を# Karato — Agent for Sakana AI fugu
 
 <!-- After the plugin is approved, replace 00000 with the numeric Marketplace ID
      (shown in the plugin page URL) so these badges render. -->

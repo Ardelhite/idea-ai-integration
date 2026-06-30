@@ -21,5 +21,8 @@ chain.crt
 private.pem
 secrets.properties
 
+# Local release runbook (may contain key paths / personal notes)
+howToUpload.md
+
 # OS
 .DS_Store

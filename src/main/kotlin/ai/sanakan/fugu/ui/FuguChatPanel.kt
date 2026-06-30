@@ -23,6 +23,9 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vcs.FileStatus
+import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.PopupStep
@@ -511,9 +514,23 @@ class FuguChatPanel(
     private fun searchProjectFiles(): List<VirtualFile> {
         val result = ArrayList<VirtualFile>()
         ReadAction.run<RuntimeException> {
-            ProjectFileIndex.getInstance(project).iterateContent { vf ->
-                if (!vf.isDirectory) result.add(vf)
-                result.size < 500
+            val fileIndex = ProjectFileIndex.getInstance(project)
+            val statusManager = FileStatusManager.getInstance(project)
+            // Skip directories that are project-excluded or VCS-ignored (e.g. node_modules,
+            // build output, or a gitignored postgres data volume like db/data/) so the @
+            // picker isn't flooded with thousands of irrelevant files.
+            fun skip(f: VirtualFile): Boolean =
+                fileIndex.isExcluded(f) || statusManager.getStatus(f) == FileStatus.IGNORED
+
+            val stack = ArrayDeque<VirtualFile>()
+            ProjectRootManager.getInstance(project).contentRoots.forEach { stack.addLast(it) }
+            while (stack.isNotEmpty() && result.size < 500) {
+                val children = stack.removeLast().children ?: continue
+                for (child in children) {
+                    if (result.size >= 500) break
+                    if (child.name == ".git" || skip(child)) continue
+                    if (child.isDirectory) stack.addLast(child) else result.add(child)
+                }
             }
         }
         return result.sortedBy { it.name }
