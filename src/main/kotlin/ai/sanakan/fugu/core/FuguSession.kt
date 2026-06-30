@@ -226,7 +226,10 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     }
 
     override fun onStderr(line: String) = onEdt {
-        notify { it.onStatus(line) }
+        // Codex emits ANSI-coloured log lines on stderr; strip the escape codes so the
+        // status line stays readable (otherwise "[2m…[31mERROR[0m…" leaks through).
+        val clean = line.replace(ANSI_ESCAPE, "").trim()
+        if (clean.isNotEmpty()) notify { it.onStatus(clean) }
     }
 
     override fun onProcessTerminated(exitCode: Int) = onEdt {
@@ -357,5 +360,10 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     override fun dispose() {
         clientRef?.stop()
         listeners.clear()
+    }
+
+    private companion object {
+        /** CSI / SGR ANSI escape sequences (e.g. ESC[31m) to strip from log lines. */
+        val ANSI_ESCAPE = Regex("\\[[0-9;?]*[ -/]*[@-~]")
     }
 }
