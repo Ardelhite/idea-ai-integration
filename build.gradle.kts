@@ -73,7 +73,8 @@ intellijPlatform {
               <li><b>0.1.2</b> — Exec cards show the command's output below a divider; shorter
                   tool labels (Exec / Writing); and the @-file picker now skips VCS-ignored and
                   excluded folders (e.g. a gitignored Postgres data volume). Strip ANSI
-                  colour codes from the status line.</li>
+                  colour codes from the status line, and collect runtime errors into a
+                  collapsible "! Runtime Exception !" panel per session.</li>
               <li><b>0.1.1</b> — Fix an IDE freeze on tool-window open (setup probe and
                   model fetch now run off the UI thread); preserve line breaks in your
                   prompts; and modernize APIs flagged on newer IDEs (replace the

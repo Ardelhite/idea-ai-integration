@@ -126,6 +126,7 @@ class FuguChatPanel(
 
     private val statusBar = StatusBar()
     private val promptArea = JPanel(BorderLayout()).apply { isVisible = false }
+    private val errorAccordion = ErrorAccordion()
     private val statusLabel = JBLabel("").apply {
         foreground = JBColor.GRAY
         horizontalAlignment = javax.swing.SwingConstants.CENTER
@@ -158,6 +159,7 @@ class FuguChatPanel(
         // Rebuild any pre-existing transcript (tool window reopened).
         session.messages.forEach { addMessageComponent(it) }
         updateBusyState(session.isBusy)
+        errorAccordion.update(session.runtimeErrorLog, session.runtimeErrorCount)
         refreshSetupBanner()
         loadModels()
     }
@@ -339,10 +341,12 @@ class FuguChatPanel(
             add(statusBar, BorderLayout.CENTER)
             add(statusLabel, BorderLayout.SOUTH)
         }
-        // Inline prompt sits between the status and the composer input.
-        val northStack = JPanel(BorderLayout()).apply {
-            add(statusArea, BorderLayout.NORTH)
-            add(promptArea, BorderLayout.CENTER)
+        // Status, then the runtime-error accordion, then any inline prompt — above the input.
+        val northStack = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            add(statusArea)
+            add(errorAccordion)
+            add(promptArea)
         }
         val south = JPanel(BorderLayout())
         south.add(northStack, BorderLayout.NORTH)
@@ -556,6 +560,10 @@ class FuguChatPanel(
         statusLabel.text = text
     }
 
+    override fun onRuntimeError(log: String, count: Int) {
+        errorAccordion.update(log, count)
+    }
+
     override fun onUserPrompt(
         prompt: ai.sanakan.fugu.cli.UserPrompt,
         respond: (ai.sanakan.fugu.cli.PromptAction, Map<String, List<String>>) -> Unit,
@@ -678,6 +686,66 @@ class FuguChatPanel(
         FuguSettings.removeChangeListener(onSettingsChanged)
         tabSpinnerTimer.stop()
         statusBar.stop()
+    }
+
+    /**
+     * A collapsible "! Runtime Exception !" panel that accumulates this session's runtime
+     * errors (verbatim, indentation preserved). Hidden until the first error; cleared with
+     * the session (tab close) or New Conversation.
+     */
+    private inner class ErrorAccordion : JPanel(BorderLayout()) {
+        private val warn = JBColor(0xD64545, 0xF87171)
+        private var expanded = false
+        private val chevron = JBLabel(AllIcons.General.ChevronRight)
+        private val titleLabel = JBLabel("! Runtime Exception !").apply { foreground = warn; font = font.deriveFont(Font.BOLD) }
+        private val body = JBTextArea().apply {
+            isEditable = false
+            isOpaque = false
+            lineWrap = true
+            wrapStyleWord = false
+            font = Font(Font.MONOSPACED, Font.PLAIN, JBUI.scaleFontSize(12f))
+            border = JBUI.Borders.empty(4, 22, 4, 6)
+        }
+        private val bodyScroll = JBScrollPane(body).apply {
+            border = JBUI.Borders.empty()
+            preferredSize = Dimension(0, JBUI.scale(160))
+            isVisible = false
+        }
+
+        init {
+            isVisible = false
+            isOpaque = false
+            border = JBUI.Borders.compound(JBUI.Borders.customLine(warn, 1), JBUI.Borders.empty(2))
+            val header = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(1))).apply {
+                isOpaque = false
+                cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+                add(chevron)
+                add(titleLabel)
+            }
+            header.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) = setExpanded(!expanded)
+            })
+            add(header, BorderLayout.NORTH)
+            add(bodyScroll, BorderLayout.CENTER)
+        }
+
+        override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
+
+        private fun setExpanded(value: Boolean) {
+            expanded = value
+            bodyScroll.isVisible = value
+            chevron.icon = if (value) AllIcons.General.ChevronDown else AllIcons.General.ChevronRight
+            revalidate(); repaint()
+        }
+
+        fun update(log: String, count: Int) {
+            if (log.isBlank()) { isVisible = false; return }
+            titleLabel.text = "! Runtime Exception !  ($count)"
+            body.text = log
+            body.caretPosition = body.document.length // keep the newest error in view
+            isVisible = true
+            revalidate(); repaint()
+        }
     }
 
     private companion object {

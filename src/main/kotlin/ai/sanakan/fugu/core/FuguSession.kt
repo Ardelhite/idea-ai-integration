@@ -41,6 +41,9 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
 
         /** The agent wants approval before acting; render it inline and call [respond] once. */
         fun onApprovalPrompt(request: ApprovalRequest, respond: (ApprovalDecision) -> Unit) {}
+
+        /** The accumulated runtime-error log for this session changed ([count] distinct errors). */
+        fun onRuntimeError(log: String, count: Int) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -55,6 +58,16 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
 
     private var currentAssistant: ChatMessage? = null
     private var turnActive = false
+
+    /** Accumulated runtime errors/exceptions for this session (kept verbatim, indentation
+     *  preserved). Shown in the "! Runtime Exception !" accordion; cleared with the session. */
+    private val errorLog = StringBuilder()
+    private var errorCount = 0
+    private var inErrorBlock = false
+
+    /** Snapshot for a panel that opens after errors already accumulated. */
+    val runtimeErrorLog: String get() = errorLog.toString()
+    val runtimeErrorCount: Int get() = errorCount
 
     /** Project agent files (CLAUDE.md etc.) are injected once per Codex thread. */
     private var agentContextSent = false
@@ -150,7 +163,23 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         streamingTextBlock = null
         sessionOutputTokens = 0L
         agentContextSent = false
+        errorLog.setLength(0)
+        errorCount = 0
+        inErrorBlock = false
+        notify { it.onRuntimeError("", 0) }
         notify { it.onStatus("New conversation") }
+    }
+
+    /** Appends to the session's runtime-error log and notifies listeners. */
+    private fun recordError(text: String, newError: Boolean) {
+        val t = text.trimEnd('\n')
+        if (t.isBlank()) return
+        if (errorLog.isNotEmpty()) errorLog.append('\n')
+        errorLog.append(t)
+        if (newError) errorCount++
+        val log = errorLog.toString()
+        val count = errorCount
+        notify { it.onRuntimeError(log, count) }
     }
 
     // --- FuguCliClient.Listener (called from process reader threads) -----------
@@ -211,6 +240,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
                     val err = ChatMessage(ChatRole.ERROR, event.text)
                     messages.add(err)
                     notify { it.onMessageAdded(err) }
+                    recordError(event.text, newError = true)
                 }
                 finishTurn()
                 event.outputTokens?.let { tok ->
@@ -228,8 +258,16 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     override fun onStderr(line: String) = onEdt {
         // Codex emits ANSI-coloured log lines on stderr; strip the escape codes so the
         // status line stays readable (otherwise "[2m…[31mERROR[0m…" leaks through).
-        val clean = line.replace(ANSI_ESCAPE, "").trim()
-        if (clean.isNotEmpty()) notify { it.onStatus(clean) }
+        val clean = line.replace(ANSI_ESCAPE, "")
+        val trimmed = clean.trim()
+        if (trimmed.isNotEmpty()) notify { it.onStatus(trimmed) }
+        // Collect error-level lines (and their indented continuations, e.g. stack frames)
+        // into the runtime-error log so they aren't lost behind the one-line status.
+        when {
+            ERROR_LINE.containsMatchIn(clean) -> { inErrorBlock = true; recordError(clean.trimEnd(), newError = true) }
+            inErrorBlock && clean.isNotBlank() && clean[0].isWhitespace() -> recordError(clean.trimEnd(), newError = false)
+            else -> inErrorBlock = false
+        }
     }
 
     override fun onProcessTerminated(exitCode: Int) = onEdt {
@@ -238,6 +276,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
                 val err = ChatMessage(ChatRole.ERROR, "Codex exited with code $exitCode.")
                 messages.add(err)
                 notify { it.onMessageAdded(err) }
+                recordError("Codex exited with code $exitCode.", newError = true)
             }
             finishTurn()
         }
@@ -247,6 +286,7 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
         val err = ChatMessage(ChatRole.ERROR, message)
         messages.add(err)
         notify { it.onMessageAdded(err) }
+        recordError(message, newError = true)
         finishTurn()
     }
 
@@ -365,5 +405,8 @@ class FuguSession(private val project: Project) : Disposable, FuguAgentListener 
     private companion object {
         /** CSI / SGR ANSI escape sequences (e.g. ESC[31m) to strip from log lines. */
         val ANSI_ESCAPE = Regex("\\[[0-9;?]*[ -/]*[@-~]")
+
+        /** stderr lines that indicate a runtime error/exception worth collecting. */
+        val ERROR_LINE = Regex("(\\bERROR\\b|(?i)\\b(exception|panic(ked)?|traceback|caused by|fatal)\\b)")
     }
 }
