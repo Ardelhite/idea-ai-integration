@@ -75,7 +75,10 @@ intellijPlatform {
                   excluded folders (e.g. a gitignored Postgres data volume). Strip ANSI
                   colour codes from the status line, and collect runtime errors into a
                   collapsible "! Runtime Exception !" panel per session. Allow git writes
-                  inside .git (Codex makes it read-only in workspace-write) so commits/gh work.</li>
+                  inside .git (Codex makes it read-only in workspace-write) so commits/gh work.
+                  Settings shows Codex's full path + version with a one-click "Update codex"
+                  (greyed "Latest codex installed" when current); the gear turns yellow when an
+                  update is available; the gear reliably opens Tools → Karato.</li>
               <li><b>0.1.1</b> — Fix an IDE freeze on tool-window open (setup probe and
                   model fetch now run off the UI thread); preserve line breaks in your
                   prompts; and modernize APIs flagged on newer IDEs (replace the

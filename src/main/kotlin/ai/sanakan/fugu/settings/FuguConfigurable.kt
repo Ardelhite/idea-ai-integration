@@ -1,5 +1,7 @@
 package ai.sanakan.fugu.settings
 
+import ai.sanakan.fugu.core.CodexInstaller
+import ai.sanakan.fugu.core.CodexVersion
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -11,10 +13,14 @@ import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
+import com.intellij.util.ui.JBUI
+import java.awt.BorderLayout
 import javax.swing.DefaultComboBoxModel
+import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
 
@@ -61,15 +67,27 @@ class FuguConfigurable : Configurable {
     }
     private val extraArgsField = JBTextField(30)
 
+    // Codex install location + version, with a one-click update.
+    private val codexInfoLabel = JBLabel(" ")
+    private val codexUpdateButton = JButton("Update codex").apply {
+        isEnabled = false
+        addActionListener { updateCodex() }
+    }
+
     /** Baseline used to detect key edits without re-reading PasswordSafe on every keystroke. */
     private var loadedKey: String = ""
 
     override fun getDisplayName(): String = "Karato"
 
     override fun createComponent(): JComponent {
+        val codexRow = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
+            add(codexInfoLabel, BorderLayout.CENTER)
+            add(codexUpdateButton, BorderLayout.EAST)
+        }
         val built = FormBuilder.createFormBuilder()
             .addLabeledComponent("Transport:", transportCombo, true)
             .addLabeledComponent("Codex CLI path:", cliPathField, true)
+            .addLabeledComponent("Codex:", codexRow, true)
             .addLabeledComponent("Model:", modelCombo, true)
             .addLabeledComponent("Permission mode:", permissionCombo, true)
             .addLabeledComponent("Send shortcut:", sendShortcutCombo, true)
@@ -84,8 +102,51 @@ class FuguConfigurable : Configurable {
             .addComponentFillVertically(JPanel(), 0)
             .panel
         reset()
+        refreshCodexInfo()
         return built
     }
+
+    /** Probes the installed Codex path/version and whether a newer one exists (off the EDT). */
+    private fun refreshCodexInfo(force: Boolean = false) {
+        codexInfoLabel.text = "Checking…"
+        codexUpdateButton.isEnabled = false
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val info = CodexVersion.check(force)
+            ApplicationManager.getApplication().invokeLater({ applyCodexInfo(info) }, ModalityState.any())
+        }
+    }
+
+    private fun applyCodexInfo(info: CodexVersion.Info) {
+        codexInfoLabel.text = when {
+            !info.installed -> "Not installed"
+            info.current != null -> "${info.path}  (v${info.current}${info.latest?.let { l -> if (info.outdated) " → v$l available" else "" } ?: ""})"
+            else -> info.path ?: "Unknown"
+        }
+        when {
+            !info.installed -> { codexUpdateButton.text = "Install codex"; codexUpdateButton.isEnabled = true }
+            info.outdated -> { codexUpdateButton.text = "Update codex"; codexUpdateButton.isEnabled = true }
+            info.known -> { codexUpdateButton.text = "Latest codex installed"; codexUpdateButton.isEnabled = false }
+            else -> { codexUpdateButton.text = "Update codex"; codexUpdateButton.isEnabled = true } // installed, latest unknown
+        }
+    }
+
+    private fun updateCodex() {
+        codexUpdateButton.isEnabled = false
+        codexInfoLabel.text = "Updating codex…"
+        CodexInstaller.install(null, object : CodexInstaller.Output {
+            override fun line(text: String) = onUi { codexInfoLabel.text = "Updating: $text" }
+            override fun done(exitCode: Int) = onUi {
+                if (exitCode == 0) refreshCodexInfo(force = true)
+                else { codexInfoLabel.text = "Update failed (exit $exitCode)"; codexUpdateButton.isEnabled = true }
+            }
+            override fun failed(message: String) = onUi {
+                codexInfoLabel.text = "Update failed: $message"; codexUpdateButton.isEnabled = true
+            }
+        })
+    }
+
+    private inline fun onUi(crossinline body: () -> Unit) =
+        ApplicationManager.getApplication().invokeLater({ body() }, ModalityState.any())
 
     override fun isModified(): Boolean {
         val s = FuguSettings.getInstance()

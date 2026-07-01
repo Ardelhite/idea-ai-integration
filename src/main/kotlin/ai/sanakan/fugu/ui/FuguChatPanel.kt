@@ -6,8 +6,10 @@ import ai.sanakan.fugu.core.FuguSetup
 import ai.sanakan.fugu.core.ProjectFiles
 import ai.sanakan.fugu.core.SakanaApi
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import ai.sanakan.fugu.core.CodexVersion
 import ai.sanakan.fugu.core.FuguSessionManager
 import ai.sanakan.fugu.core.McpConfig
+import com.intellij.util.IconUtil
 import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
@@ -104,6 +106,7 @@ class FuguChatPanel(
         toolTipText = "Which Claude MCP servers Codex may use (Off / this project / all)"
     }
     private var syncingMcp = false
+    private lateinit var settingsButton: JButton
 
     private val sendButton = SendButton { onSendOrStop() }
     private val sendHint = JBLabel("", javax.swing.SwingConstants.CENTER).apply {
@@ -162,6 +165,21 @@ class FuguChatPanel(
         errorAccordion.update(session.runtimeErrorLog, session.runtimeErrorCount)
         refreshSetupBanner()
         loadModels()
+        checkCodexOutdated()
+    }
+
+    /** On startup, if Codex is out of date, tint the gear yellow and prompt an update on hover. */
+    private fun checkCodexOutdated() {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val info = CodexVersion.check()
+            if (!info.outdated) return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater({
+                if (project.isDisposed || !::settingsButton.isInitialized) return@invokeLater
+                settingsButton.icon = IconUtil.colorize(AllIcons.General.Settings, JBColor(0xE5A50A, 0xF2C94C))
+                settingsButton.toolTipText =
+                    "Codex is outdated (v${info.current} → v${info.latest}). Open Settings → Karato to update."
+            }, ModalityState.any())
+        }
     }
 
     private fun buildToolbar(): JComponent {
@@ -170,7 +188,8 @@ class FuguChatPanel(
         val left = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply { isOpaque = false }
         left.add(textButton("CLEAR", "Clear this conversation and start a fresh Fugu thread") { newConversation() })
         left.add(iconButton(AllIcons.Actions.Download, "Set up Fugu") { openSetup() })
-        left.add(iconButton(AllIcons.General.Settings, "Settings") { openSettings() })
+        settingsButton = iconButton(AllIcons.General.Settings, "Settings") { openSettings() }
+        left.add(settingsButton)
 
         mcpCombo.maximumSize = Dimension(JBUI.scale(120), mcpCombo.preferredSize.height)
         mcpCombo.addActionListener { onMcpModeSelected() }
@@ -638,7 +657,9 @@ class FuguChatPanel(
     }
 
     private fun openSettings() {
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, "ai.sanakan.fugu.settings.FuguConfigurable")
+        // Navigate to our configurable by class so it reliably opens Tools → Karato
+        // (the id-string overload sometimes lands on the settings root).
+        ShowSettingsUtil.getInstance().showSettingsDialog(project, ai.sanakan.fugu.settings.FuguConfigurable::class.java)
     }
 
     /** Applies a new MCP scope: persist, sync other tabs, rewrite Codex config, reload. */

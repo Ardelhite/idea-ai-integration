@@ -75,14 +75,14 @@ object CodexInstaller {
     fun hasFuguLauncher(): Boolean = PathEnvironmentVariableUtil.findInPath("codex-fugu") != null
 
     /** Runs the Fugu installer in the background, streaming output to [output]. */
-    fun install(project: Project, output: Output) {
+    fun install(project: Project?, output: Output) {
         val cmd = GeneralCommandLine("/bin/bash", "-lc", installScript()).apply {
             charset = StandardCharsets.UTF_8
             // Inject the stored key (so the installer needs no prompt) and force
             // non-interactive mode, since there is no terminal to answer prompts.
             withEnvironment(FuguEnv.codexEnvironment())
             withEnvironment(mapOf("FUGU_ASSUME_YES" to "1", "FUGU_FORCE" to "1", "GIT_TERMINAL_PROMPT" to "0"))
-            project.basePath?.let { setWorkDirectory(it) }
+            project?.basePath?.let { setWorkDirectory(it) }
         }
 
         object : Task.Backgroundable(project, "Installing Codex (Fugu)", true) {
@@ -95,7 +95,10 @@ object CodexInstaller {
                             event.text.lineSequence().forEach { if (it.isNotBlank()) output.line(it.trimEnd()) }
                         }
 
-                        override fun processTerminated(event: ProcessEvent) = output.done(event.exitCode)
+                        override fun processTerminated(event: ProcessEvent) {
+                            CodexVersion.invalidate() // a fresh install may change the version
+                            output.done(event.exitCode)
+                        }
                     })
                     handler.startNotify()
                     while (!handler.isProcessTerminated) {
