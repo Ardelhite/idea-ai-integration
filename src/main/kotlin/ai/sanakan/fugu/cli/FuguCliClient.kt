@@ -4,7 +4,7 @@ import ai.sanakan.fugu.settings.FuguEnv
 import ai.sanakan.fugu.settings.FuguSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessListener
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessOutputType
 import com.intellij.openapi.diagnostic.logger
@@ -110,7 +110,7 @@ class FuguCliClient(
         handler = null
     }
 
-    private inner class StdoutPump : ProcessAdapter() {
+    private inner class StdoutPump : ProcessListener {
         private val buffer = StringBuilder()
 
         override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {

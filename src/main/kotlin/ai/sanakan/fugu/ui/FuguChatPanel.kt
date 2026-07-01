@@ -9,7 +9,6 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import ai.sanakan.fugu.core.CodexVersion
 import ai.sanakan.fugu.core.FuguSessionManager
 import ai.sanakan.fugu.core.McpConfig
-import com.intellij.util.IconUtil
 import ai.sanakan.fugu.settings.FuguPermissionMode
 import ai.sanakan.fugu.settings.FuguSecrets
 import ai.sanakan.fugu.settings.FuguSettings
@@ -96,12 +95,12 @@ class FuguChatPanel(
         toolTipText = "Model"
     }
     private val modeCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.modeLabel ?: "" }
+        renderer = comboRenderer { it.modeLabel }
         selectedItem = FuguSettings.getInstance().permissionModeEnum
         toolTipText = FuguSettings.getInstance().permissionModeEnum.display
     }
     private val mcpCombo = ComboBox(DefaultComboBoxModel(McpMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
+        renderer = comboRenderer { it.display }
         selectedItem = FuguSettings.getInstance().mcpModeEnum
         toolTipText = "Which Claude MCP servers Codex may use (Off / this project / all)"
     }
@@ -175,7 +174,7 @@ class FuguChatPanel(
             if (!info.outdated) return@executeOnPooledThread
             ApplicationManager.getApplication().invokeLater({
                 if (project.isDisposed || !::settingsButton.isInitialized) return@invokeLater
-                settingsButton.icon = IconUtil.colorize(AllIcons.General.Settings, JBColor(0xE5A50A, 0xF2C94C))
+                settingsButton.icon = TintedIcon(AllIcons.General.Settings, JBColor(0xE5A50A, 0xF2C94C))
                 settingsButton.toolTipText =
                     "Codex is outdated (v${info.current} → v${info.latest}). Open Settings → Karato to update."
             }, ModalityState.any())
@@ -777,6 +776,35 @@ class FuguChatPanel(
          */
         val TAB_SPINNER = arrayOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
     }
+}
+
+/** A combo-box renderer via subclassing (the SimpleListCellRenderer.create factory is
+ *  scheduled for removal). */
+private fun <T> comboRenderer(render: (T) -> String) = object : SimpleListCellRenderer<T>() {
+    override fun customize(list: javax.swing.JList<out T>, value: T?, index: Int, selected: Boolean, hasFocus: Boolean) {
+        text = value?.let(render) ?: ""
+    }
+}
+
+/**
+ * Tints an icon by filling its opaque pixels with [tint] (SRC_ATOP). Pure Swing, so it
+ * avoids IconUtil.colorize — whose default-args bridge was removed in 2025.2.
+ */
+private class TintedIcon(private val base: javax.swing.Icon, private val tint: java.awt.Color) : javax.swing.Icon {
+    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+        val g2 = g.create() as Graphics2D
+        try {
+            base.paintIcon(c, g2, x, y)
+            g2.composite = java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_ATOP)
+            g2.color = tint
+            g2.fillRect(x, y, iconWidth, iconHeight)
+        } finally {
+            g2.dispose()
+        }
+    }
+
+    override fun getIconWidth(): Int = base.iconWidth
+    override fun getIconHeight(): Int = base.iconHeight
 }
 
 /**

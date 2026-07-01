@@ -22,7 +22,16 @@ import java.awt.BorderLayout
 import javax.swing.DefaultComboBoxModel
 import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JList
 import javax.swing.JPanel
+
+/** A combo-box renderer built by subclassing (the SimpleListCellRenderer.create factory is
+ *  scheduled for removal). */
+private fun <T> displayRenderer(render: (T) -> String) = object : SimpleListCellRenderer<T>() {
+    override fun customize(list: JList<out T>, value: T?, index: Int, selected: Boolean, hasFocus: Boolean) {
+        text = value?.let(render) ?: ""
+    }
+}
 
 /**
  * Settings UI under Preferences → Tools → Karato.
@@ -30,7 +39,7 @@ import javax.swing.JPanel
 class FuguConfigurable : Configurable {
 
     private val transportCombo = ComboBox(DefaultComboBoxModel(FuguTransportKind.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
+        renderer = displayRenderer { it.display }
     }
     private val cliPathField = TextFieldWithBrowseButton().apply {
         textField.columns = 30
@@ -48,10 +57,10 @@ class FuguConfigurable : Configurable {
         isEditable = true
     }
     private val permissionCombo = ComboBox(DefaultComboBoxModel(FuguPermissionMode.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
+        renderer = displayRenderer { it.display }
     }
     private val sendShortcutCombo = ComboBox(DefaultComboBoxModel(SendShortcut.entries.toTypedArray())).apply {
-        renderer = SimpleListCellRenderer.create { label, value, _ -> label.text = value?.display ?: "" }
+        renderer = displayRenderer { it.display }
     }
     private val sakanaProviderCheck =
         JBCheckBox("Add Sakana provider override (-c model_provider=sakana)")

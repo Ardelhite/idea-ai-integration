@@ -5,8 +5,8 @@ import ai.sanakan.fugu.settings.FuguSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessListener
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -90,7 +90,7 @@ object CodexInstaller {
                 indicator.isIndeterminate = true
                 try {
                     val handler = OSProcessHandler(cmd)
-                    handler.addProcessListener(object : ProcessAdapter() {
+                    handler.addProcessListener(object : ProcessListener {
                         override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                             event.text.lineSequence().forEach { if (it.isNotBlank()) output.line(it.trimEnd()) }
                         }

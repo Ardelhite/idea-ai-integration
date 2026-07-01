@@ -70,6 +70,10 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
+              <li><b>0.1.3</b> — Compatibility fixes flagged by the Plugin Verifier on newer
+                  IDEs: remove the runtime-breaking IconUtil.colorize call (NoSuchMethodError on
+                  2025.2+), replace the scheduled-for-removal SimpleListCellRenderer.create,
+                  and drop deprecated ProcessAdapter / StartupActivity usages.</li>
               <li><b>0.1.2</b> — Exec cards show the command's output below a divider; shorter
                   tool labels (Exec / Writing); and the @-file picker now skips VCS-ignored and
                   excluded folders (e.g. a gitignored Postgres data volume). Strip ANSI
@@ -123,6 +127,7 @@ intellijPlatform {
     pluginVerification {
         ides {
             ide(IntelliJPlatformType.IntellijIdeaCommunity, providers.gradleProperty("platformVersion").get())
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6")
         }
     }
 }
