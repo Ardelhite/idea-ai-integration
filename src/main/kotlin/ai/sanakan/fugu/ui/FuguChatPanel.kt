@@ -787,20 +787,24 @@ private fun <T> comboRenderer(render: (T) -> String) = object : SimpleListCellRe
 }
 
 /**
- * Tints an icon by filling its opaque pixels with [tint] (SRC_ATOP). Pure Swing, so it
- * avoids IconUtil.colorize — whose default-args bridge was removed in 2025.2.
+ * Tints an icon by recolouring its opaque pixels with [tint]. The icon is rendered onto a
+ * fresh transparent (HiDPI-aware) image first, so SRC_ATOP colours only the icon's shape —
+ * painting straight onto the button graphics tinted the whole (opaque) square instead.
+ * Pure Swing + ImageUtil, so it avoids IconUtil.colorize (its bridge was removed in 2025.2).
  */
 private class TintedIcon(private val base: javax.swing.Icon, private val tint: java.awt.Color) : javax.swing.Icon {
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-        val g2 = g.create() as Graphics2D
+        val image = com.intellij.util.ui.ImageUtil.createImage(g, iconWidth, iconHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        val ig = image.graphics as Graphics2D
         try {
-            base.paintIcon(c, g2, x, y)
-            g2.composite = java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_ATOP)
-            g2.color = tint
-            g2.fillRect(x, y, iconWidth, iconHeight)
+            base.paintIcon(c, ig, 0, 0)
+            ig.composite = java.awt.AlphaComposite.SrcAtop
+            ig.color = tint
+            ig.fillRect(0, 0, iconWidth, iconHeight)
         } finally {
-            g2.dispose()
+            ig.dispose()
         }
+        com.intellij.util.ui.StartupUiUtil.drawImage(g, image, x, y, null)
     }
 
     override fun getIconWidth(): Int = base.iconWidth
