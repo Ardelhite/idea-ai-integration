@@ -145,8 +145,13 @@ class FuguConfigurable : Configurable {
         CodexInstaller.install(null, object : CodexInstaller.Output {
             override fun line(text: String) = onUi { codexInfoLabel.text = "Updating: $text" }
             override fun done(exitCode: Int) = onUi {
-                if (exitCode == 0) refreshCodexInfo(force = true)
-                else { codexInfoLabel.text = "Update failed (exit $exitCode)"; codexUpdateButton.isEnabled = true }
+                if (exitCode == 0) {
+                    refreshCodexInfo(force = true)
+                    FuguSettings.fireChanged() // open panels re-check the (yellow) gear
+                } else {
+                    codexInfoLabel.text = "Update failed (exit $exitCode)"
+                    codexUpdateButton.isEnabled = true
+                }
             }
             override fun failed(message: String) = onUi {
                 codexInfoLabel.text = "Update failed: $message"; codexUpdateButton.isEnabled = true

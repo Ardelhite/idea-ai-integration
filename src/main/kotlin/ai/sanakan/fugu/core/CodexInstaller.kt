@@ -43,7 +43,9 @@ object CodexInstaller {
         return buildString {
             append("set -e\n")
             append("export GIT_TERMINAL_PROMPT=0\n")
-            append("if [ ! -d \"$dir/.git\" ]; then git clone --depth 1 https://github.com/SakanaAI/fugu.git \"$dir\"; fi\n")
+            append("if [ ! -d \"$dir/.git\" ]; then git clone --depth 1 https://github.com/SakanaAI/fugu.git \"$dir\"; ")
+            // An existing clone must be refreshed, or updates keep installing the old pin.
+            append("else git -C \"$dir\" pull --ff-only || true; fi\n")
             append("exec bash \"$dir/scripts/install.sh\" --yes --force\n")
         }
     }

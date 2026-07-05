@@ -4,23 +4,24 @@ import ai.sanakan.fugu.settings.FuguEnv
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.util.ExecUtil
 import com.intellij.util.io.HttpRequests
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 
 /**
  * Detects the installed Codex version and whether a newer one is available, so the UI
  * can offer an "Update codex" action and nag (yellow gear) when it's out of date.
  *
- * "Latest" is the published `@openai/codex` npm version. The result is cached for the IDE
- * session (invalidated after an update). All calls block — run OFF the EDT.
+ * "Latest" is the codex version PINNED BY THE FUGU BUNDLE (BUNDLE_CODEX_VERSION in the
+ * SakanaAI/fugu repo) — that's what our updater actually installs. Comparing against the
+ * npm `@openai/codex` release would nag forever whenever the bundle pins an older build
+ * (e.g. bundle 0.142.2 vs npm 0.142.5): the update runs, installs the pin, and the gear
+ * stays yellow. If the pin can't be fetched, `latest` stays null and we don't nag.
+ * The result is cached for the IDE session (invalidated after an update). All calls
+ * block — run OFF the EDT.
  */
 object CodexVersion {
 
-    private const val LATEST_URL = "https://registry.npmjs.org/@openai/codex/latest"
-    private val json = Json { ignoreUnknownKeys = true }
+    private const val BUNDLE_URL = "https://raw.githubusercontent.com/SakanaAI/fugu/main/configs/bundle.sh"
+    private val PIN = Regex("^\\s*BUNDLE_CODEX_VERSION=\"?([0-9]+\\.[0-9]+\\.[0-9]+)\"?", RegexOption.MULTILINE)
     private val SEMVER = Regex("(\\d+)\\.(\\d+)\\.(\\d+)")
 
     @Volatile
@@ -55,9 +56,8 @@ object CodexVersion {
     }.getOrNull()
 
     private fun fetchLatest(): String? = runCatching {
-        val body = HttpRequests.request(LATEST_URL).connectTimeout(8000).readTimeout(8000).readString()
-        val version = json.parseToJsonElement(body).jsonObject["version"]?.jsonPrimitive?.contentOrNull
-        version?.let { SEMVER.find(it)?.value }
+        val body = HttpRequests.request(BUNDLE_URL).connectTimeout(8000).readTimeout(8000).readString()
+        PIN.find(body)?.groupValues?.get(1)
     }.getOrNull()
 
     private fun parts(v: String): IntArray? =

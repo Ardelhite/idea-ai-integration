@@ -115,7 +115,7 @@ class FuguChatPanel(
     }
     private val onSettingsChanged = Runnable {
         ApplicationManager.getApplication().invokeLater({
-            if (!project.isDisposed) { refreshSendHint(); syncMcpCombo() }
+            if (!project.isDisposed) { refreshSendHint(); syncMcpCombo(); checkCodexOutdated() }
         }, ModalityState.any())
     }
 
@@ -167,16 +167,21 @@ class FuguChatPanel(
         checkCodexOutdated()
     }
 
-    /** On startup, if Codex is out of date, tint the gear yellow and prompt an update on hover. */
+    /** If Codex is out of date, tint the gear yellow and prompt an update on hover;
+     *  restore the normal gear (e.g. right after an update) otherwise. */
     private fun checkCodexOutdated() {
         ApplicationManager.getApplication().executeOnPooledThread {
             val info = CodexVersion.check()
-            if (!info.outdated) return@executeOnPooledThread
             ApplicationManager.getApplication().invokeLater({
                 if (project.isDisposed || !::settingsButton.isInitialized) return@invokeLater
-                settingsButton.icon = TintedIcon(AllIcons.General.Settings, JBColor(0xE5A50A, 0xF2C94C))
-                settingsButton.toolTipText =
-                    "Codex is outdated (v${info.current} → v${info.latest}). Open Settings → Karato to update."
+                if (info.outdated) {
+                    settingsButton.icon = TintedIcon(AllIcons.General.Settings, JBColor(0xE5A50A, 0xF2C94C))
+                    settingsButton.toolTipText =
+                        "Codex is outdated (v${info.current} → v${info.latest}). Open Settings → Karato to update."
+                } else {
+                    settingsButton.icon = AllIcons.General.Settings
+                    settingsButton.toolTipText = "Settings"
+                }
             }, ModalityState.any())
         }
     }
