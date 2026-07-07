@@ -70,6 +70,10 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
+              <li><b>0.1.4</b> — Fix "Update codex" never completing: the updater now
+                  refreshes the Fugu installer before running, compares against the
+                  version the Fugu bundle actually pins (not the npm release), and the
+                  yellow gear returns to normal once Codex is up to date.</li>
               <li><b>0.1.3</b> — Compatibility fixes flagged by the Plugin Verifier on newer
                   IDEs: remove the runtime-breaking IconUtil.colorize call (NoSuchMethodError on
                   2025.2+), replace the scheduled-for-removal SimpleListCellRenderer.create,
