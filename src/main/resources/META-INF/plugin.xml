@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>ai.sanakan.fugu.idea</id>
     <name>Karato - Agent for Sakana AI fugu</name>
     <vendor email="harima42@gmail.com" url="https://github.com/Ardelhite/idea-ai-integration">Karato</vendor>

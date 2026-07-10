@@ -20,7 +20,7 @@ enum class FuguPermissionMode(
     val bypass: Boolean,
 ) {
     ASK("Default", "Ask before each edit or command", "workspace-write", "on-request", false),
-    ACCEPT_EDITS("Auto", "Auto-edit the workspace, no prompts", "workspace-write", "never", false),
+    ACCEPT_EDITS("Auto", "Auto-run without prompts — full access", "danger-full-access", "never", true),
     FULL_ACCESS("Agent", "Full access — no sandbox, no prompts", "danger-full-access", "never", true),
     READ_ONLY("Plan", "Read-only — inspect/plan, no edits", "read-only", "never", false);
 
@@ -90,8 +90,19 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
     /** Which transport drives the agent, stored by enum name. */
     var transport: String = FuguTransportKind.APP_SERVER.name
 
-    /** Permission mode (sandbox + approval), stored by enum name. */
-    var permissionMode: String = FuguPermissionMode.ASK.name
+    /**
+     * Permission mode (sandbox + approval), stored by enum name.
+     *
+     * Defaults to [FuguPermissionMode.FULL_ACCESS] ("Agent"): the sandbox is lifted and no
+     * approvals are required, so commands like `docker …`, temp-file writes, and cleanup
+     * `rm` never hit Codex's "blocked by policy" rejection. "Auto" also runs full-access
+     * (same sandbox lift). Version 0.1.5 migrates previously saved modes to Agent once;
+     * users can still switch back to Default/Ask or Plan for untrusted projects.
+     */
+    var permissionMode: String = FuguPermissionMode.FULL_ACCESS.name
+
+    /** Whether the one-shot 0.1.5 permission-mode migration has been applied. */
+    var migratedPermissionModeFor015: Boolean = false
 
     /** Add `-c model_provider=sakana`. Leave on for plain `codex`; off for `codex-fugu`. */
     var sakanaProvider: Boolean = true
@@ -128,10 +139,26 @@ class FuguSettings : PersistentStateComponent<FuguSettings> {
     val sendShortcutEnum: SendShortcut
         get() = SendShortcut.fromName(sendShortcut)
 
-    override fun getState(): FuguSettings = this
+    override fun getState(): FuguSettings {
+        migratedPermissionModeFor015 = true
+        return this
+    }
 
     override fun loadState(state: FuguSettings) {
         XmlSerializerUtil.copyBean(state, this)
+        migrateSettingsFor015()
+    }
+
+    /**
+     * One-time 0.1.5 migration: existing users may have saved Ask/Auto/Plan from older
+     * versions, where sandboxed modes commonly produced Codex's "blocked by policy" error.
+     * Force the saved mode to Agent once when 0.1.5 first reads an older settings file.
+     * After the marker is written, any later user-selected mode is respected.
+     */
+    private fun migrateSettingsFor015() {
+        if (migratedPermissionModeFor015) return
+        permissionMode = FuguPermissionMode.FULL_ACCESS.name
+        migratedPermissionModeFor015 = true
     }
 
     val permissionModeEnum: FuguPermissionMode

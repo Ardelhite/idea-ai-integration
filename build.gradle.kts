@@ -25,6 +25,7 @@ dependencies {
         create(
             providers.gradleProperty("platformType").get(),
             providers.gradleProperty("platformVersion").get(),
+            useInstaller = false,
         )
         testFramework(TestFrameworkType.Platform)
 
@@ -70,6 +71,20 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
+              <li><b>0.1.5</b> — Default the permission mode to <b>Agent (full access)</b> so
+                  routine commands (docker, temp-file writes, cleanup <code>rm</code>) no longer
+                  hit Codex's "blocked by policy" rejection in the default setup. Also make the
+                  chat "Mode" dropdown take effect on the very next message (the sandbox is now
+                  overridden per turn, not only at New Conversation), and handle Codex's
+                  <code>item/permissions/requestApproval</code> escalation so Ask-mode approval
+                  requests actually appear inline instead of silently failing as
+                  "blocked by policy". <b>Auto</b> mode now also bypasses the sandbox (like
+                  <b>Agent</b>), and 0.1.5 performs a one-time migration of previously saved
+                  modes to <b>Agent</b>; after that, user-selected modes are respected and
+                  <b>Default/Ask</b> plus <b>Plan</b> remain sandboxed. Karato now also requires
+                  an IDE restart after install/update, so the Plugins page shows JetBrains'
+                  restart button instead of letting a half-loaded install fail on the first
+                  prompt.</li>
               <li><b>0.1.4</b> — Fix "Update codex" never completing: the updater now
                   refreshes the Fugu installer before running, compares against the
                   version the Fugu bundle actually pins (not the npm release), and the
@@ -189,7 +204,14 @@ tasks {
             // it (and its dependents) to silence the noise.
             val cfg = configDir.get().asFile.also { it.mkdirs() }
             val disabled = File(cfg, "disabled_plugins.txt")
-            val want = listOf("com.intellij.gradle", "org.jetbrains.plugins.gradle")
+            val want = listOf(
+                "com.intellij.gradle",
+                "org.jetbrains.plugins.gradle",
+                "org.jetbrains.idea.gradle.dsl",
+                "org.jetbrains.plugins.gradle.analysis",
+                "org.jetbrains.plugins.gradle.dependency.updater",
+                "org.jetbrains.plugins.gradle.maven",
+            )
             val ids = (if (disabled.isFile) disabled.readLines() else emptyList()).map { it.trim() }
                 .filter { it.isNotEmpty() }.toMutableSet()
             if (ids.addAll(want)) disabled.writeText(ids.joinToString("\n") + "\n")

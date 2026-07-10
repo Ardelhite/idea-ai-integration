@@ -50,10 +50,11 @@ happen.
 
 **From the JetBrains Marketplace** (recommended, once approved):
 Settings → **Plugins** → **Marketplace** → search **“Karato”** → **Install**.
+After installing or updating, click **Restart IDE** in the Plugins page before using Karato.
 
 **From disk:**
 1. Download `Karato-<version>.zip` (or build it — see below).
-2. Settings → **Plugins** → ⚙ → **Install Plugin from Disk…** → pick the ZIP → restart.
+2. Settings → **Plugins** → ⚙ → **Install Plugin from Disk…** → pick the ZIP → **Restart IDE**.
 
 **Build it yourself:**
 ```bash
@@ -111,7 +112,7 @@ Codex (`codex mcp add …`) keep working regardless of the dropdown.
 | Transport | codex app-server | `app-server` (interactive approvals) or `exec` (headless) |
 | Codex CLI path | `codex` | or `codex-fugu`, or an absolute path |
 | Model | `fugu` | `fugu` / `fugu-ultra` (also fetched live from your account) |
-| Permission mode | Ask before each edit/command | sandbox + approval policy (see below) |
+| Permission mode | Agent (full access) | sandbox + approval policy (see below); pick a stricter mode for untrusted projects |
 | Send shortcut | Enter to send | or `⌘/Alt + Enter` (Enter inserts a newline) |
 | Load Claude/Codex project files | on | inject `CLAUDE.md` / `.claude/` / memory at thread start |
 | Allow network in sandbox | on | adds `-c sandbox_workspace_write.network_access=true` so `gh`/`curl`/`npm` work |
@@ -129,8 +130,15 @@ Permission modes (sandbox + approval policy):
 |---|---|---|---|
 | Ask before each edit/command | workspace-write | on-request | **app-server only** — prompts inline; `exec` clamps to never |
 | Read-only (plan) | read-only | never | no edits |
-| Auto-edit workspace | workspace-write | never | edits without prompting |
-| Full access | danger-full-access | never | bypasses the sandbox |
+| Auto | danger-full-access | never | bypasses the sandbox (like Agent); runs without prompting |
+| Full access (Agent) | danger-full-access | never | **default** — bypasses the sandbox; recommended when you frequently want Docker or other commands to run without approval, and only for trusted projects |
+
+The chat **Mode** dropdown applies on the next message. Selecting **Auto** or **Agent** lifts the
+sandbox itself, so Docker operations, temporary-file cleanup, and similar local commands are not
+blocked by Codex's sandbox policy. When 0.1.5 first reads an older saved configuration, it migrates
+the saved mode to **Agent** once; after that, user-selected modes are respected. **Default/Ask** and
+**Plan** remain sandboxed modes. In app-server mode, Ask-mode sandbox escalations are shown inline as
+Approve / Decline prompts.
 
 ## Data & privacy
 

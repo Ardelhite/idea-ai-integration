@@ -204,13 +204,17 @@ class FuguAppServerClient(
 
     private fun startTurn(prompt: String) {
         val tid = threadId ?: return
-        val mode = FuguSettings.getInstance().permissionModeEnum
+        val settings = FuguSettings.getInstance()
+        val mode = settings.permissionModeEnum
         val params = buildJsonObject {
             put("threadId", tid)
             // Apply the current mode per-turn so the chat "Mode" dropdown takes effect
-            // without restarting the thread. (Sandbox is fixed at thread start; a full
-            // sandbox change — e.g. Plan/Agent — applies on the next New Conversation.)
+            // immediately — no New Conversation needed. Both the approval policy AND the
+            // sandbox are overridden here (turn/start accepts sandboxPolicy since app-server
+            // v2), so switching to "Agent" (full access) lifts the sandbox on the very next
+            // message and docker/temp-file/rm commands stop hitting "blocked by policy".
             put("approvalPolicy", if (mode.bypass) "never" else mode.approval)
+            put("sandboxPolicy", sandboxPolicyJson(mode, settings))
             put("input", buildJsonArray {
                 add(buildJsonObject {
                     put("type", "text")
@@ -222,6 +226,24 @@ class FuguAppServerClient(
             if (error != null) listener.onEvent(FuguEvent.Result(true, "turn/start failed: ${error["message"].str()}", null))
         }
     }
+
+    /**
+     * Builds the app-server `SandboxPolicy` object for [mode], mirroring the network /
+     * writable-roots options applied at server start so a per-turn override stays
+     * consistent with the process-level `-c sandbox_workspace_write.*` flags.
+     */
+    private fun sandboxPolicyJson(mode: ai.sanakan.fugu.settings.FuguPermissionMode, settings: FuguSettings): JsonObject =
+        when (mode.sandbox) {
+            "danger-full-access" -> buildJsonObject { put("type", "dangerFullAccess") }
+            "read-only" -> buildJsonObject { put("type", "readOnly") }
+            else -> buildJsonObject {
+                put("type", "workspaceWrite")
+                put("networkAccess", settings.allowNetwork)
+                if (settings.allowGitWrites) {
+                    put("writableRoots", buildJsonArray { add("$workingDir/.git") })
+                }
+            }
+        }
 
     // --- JSON-RPC plumbing -----------------------------------------------------
 
@@ -288,6 +310,7 @@ class FuguAppServerClient(
         when (method) {
             "item/fileChange/requestApproval" -> approve(id, ApprovalKind.FILE_CHANGE, params)
             "item/commandExecution/requestApproval" -> approve(id, ApprovalKind.COMMAND, params)
+            "item/permissions/requestApproval" -> approvePermissions(id, params)
             "mcpServer/elicitation/request" -> elicit(id, params)
             "item/tool/requestUserInput" -> requestUserInput(id, params)
             else -> respondError(id, -32601, "unsupported request: $method")
@@ -299,10 +322,46 @@ class FuguAppServerClient(
         val summary = when (kind) {
             ApprovalKind.COMMAND -> "Run command: ${params?.get("command").str() ?: "?"}"
             ApprovalKind.FILE_CHANGE -> "Apply file changes" + (params?.get("grantRoot").str()?.let { " under $it" } ?: "")
+            ApprovalKind.PERMISSIONS -> "Grant additional permissions"
         }
         listener.onApproval(ApprovalRequest(kind, summary, reason)) { decision ->
             respondResult(id, buildJsonObject { put("decision", decision.wire) })
         }
+    }
+
+    /**
+     * Codex asks to grant extra sandbox permissions (filesystem / network) before it can
+     * proceed — e.g. a command that needs to escape the workspace-write sandbox while in
+     * Ask mode. This request has its OWN response shape (`{permissions, scope}`), not the
+     * `{decision}` envelope the command/file approvals use. Previously this method fell
+     * through to the `-32601 unsupported request` branch, so the agent treated the
+     * escalation as failed and it surfaced to the user as "blocked by policy" with no
+     * prompt ever shown — i.e. the approval request never reached the UI. Route it through
+     * the same inline Approve / Decline panel instead: accepting grants exactly what was
+     * requested (scope `turn`, or `session` for "Approve for session"); declining/cancel
+     * grants nothing (an empty profile), letting the turn continue.
+     */
+    private fun approvePermissions(id: JsonElement, params: JsonObject?) {
+        val reason = params?.get("reason").str()
+        val requested = params?.get("permissions") as? JsonObject
+        val summary = "Grant additional permissions" + permissionsSummary(requested)
+        listener.onApproval(ApprovalRequest(ApprovalKind.PERMISSIONS, summary, reason)) { decision ->
+            val granted = decision == ApprovalDecision.ACCEPT || decision == ApprovalDecision.ACCEPT_FOR_SESSION
+            respondResult(id, buildJsonObject {
+                put("permissions", if (granted && requested != null) requested else JsonObject(emptyMap()))
+                put("scope", if (decision == ApprovalDecision.ACCEPT_FOR_SESSION) "session" else "turn")
+            })
+        }
+    }
+
+    /** Short "(filesystem, network)" hint describing what the permissions request covers. */
+    private fun permissionsSummary(requested: JsonObject?): String {
+        if (requested == null) return ""
+        val parts = buildList {
+            if (requested["fileSystem"] is JsonObject) add("filesystem")
+            if (requested["network"] is JsonObject) add("network")
+        }
+        return if (parts.isEmpty()) "" else " (${parts.joinToString(", ")})"
     }
 
     // --- structured user-input prompts -----------------------------------------

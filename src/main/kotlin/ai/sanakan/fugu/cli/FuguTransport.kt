@@ -26,7 +26,7 @@ interface FuguTransport {
 }
 
 /** What kind of action an approval request is gating. */
-enum class ApprovalKind { COMMAND, FILE_CHANGE }
+enum class ApprovalKind { COMMAND, FILE_CHANGE, PERMISSIONS }
 
 /** A decision the user can return for an approval request (app-server values). */
 enum class ApprovalDecision(val wire: String) {
